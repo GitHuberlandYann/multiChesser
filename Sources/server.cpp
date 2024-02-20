@@ -28,7 +28,7 @@ void broadcast( int fd, std::string msg, fd_set *wfds ) {
 			send(i, &msg[0], msg.size(), 0);
 		}
 	}
-	std::cout << msg << std::endl;
+	std::cout << msg << std::flush;
 }
 
 int main( int ac, char **av )
@@ -37,7 +37,7 @@ int main( int ac, char **av )
 		error("Error format: ./server <port>");
 	}
 
-	std::cout << "Hello World!" << std::endl;
+	std::cout << "Server started, waiting for connections..." << std::endl;
 	int fd = socket(AF_INET, SOCK_STREAM, 0);
 	if (fd == -1) {
 		error("Fatal error socket");
@@ -79,19 +79,19 @@ int main( int ac, char **av )
 			continue;
 		}
 
-		// we skip ourself and fds not part of read fds
+		// we skip ourself and fds not part of read set
 		for (int i = 0; i < FD_SETSIZE; i++) {
 			if (i == fd || !FD_ISSET(i, &rfds)) continue;
 
 			char buff[1024];
 			ssize_t n = recv(i, buff, sizeof(buff), 0);
 
-			if (n == -1) { // client leaves
+			if (n == -1 || n == 0) { // client leaves
 				msg = "server: client " + std::to_string(clients[i].id) + " just left\n";
 				broadcast(i, msg, &wfds);
 				clients[i].str = "";
 				close(i);
-				FD_CLR(i, &fds); // rm fd from fd set
+				FD_CLR(i, &fds); // rm client from fd set
 				continue;
 			}
 
@@ -102,12 +102,12 @@ int main( int ac, char **av )
 				c.str += buff[j];
 				if (buff[j] == '\n') {
 					msg = "client " + std::to_string(c.id) + ": " + c.str;
-					std::cout << msg << std::endl;
 					broadcast(i, msg, &wfds),
 					c.str = "";
 				}
 			}
 		}
 	}
+	std::cout << "server closed" << std::endl;
 	return (0);
 }

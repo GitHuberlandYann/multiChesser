@@ -51,7 +51,7 @@ int main( int ac, char **av )
 			char buff[1024];
 			ssize_t n = read(STDIN_FILENO, buff, sizeof(buff));
 
-			if (n == -1) { // client leaves
+			if (n == -1 || n == 0) {
 				error("Fatal error input");
 			}
 			if (n == 1) break ;
@@ -70,7 +70,7 @@ int main( int ac, char **av )
 			char buff[1024];
 			ssize_t n = recv(fd, buff, sizeof(buff), 0);
 
-			if (n == -1) { // client leaves
+			if (n == -1 || n == 0) {
 				error("Fatal error recv");
 			}
 
