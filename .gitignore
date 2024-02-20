@@ -26,7 +26,12 @@
 *.a
 *.lib
 
+# Logs
+*.log
+
 # Executables
 *.exe
 *.out
 *.app
+server
+client
