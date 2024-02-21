@@ -3,8 +3,8 @@ CLI_NAME		= client
 OBJS_DIR		= Objs
 SRCS_DIR		= Sources
 
-FILES_SERVER	= server utils
-FILES_CLIENT	= client utils
+FILES_SERVER	= main_server Server utils
+FILES_CLIENT	= main_client Client utils
 
 SRCS			= $(addprefix $(SRCS_DIR)/, $(addsuffix .cpp, $(FILES_SERVER)))
 OBJS 			= $(addprefix $(OBJS_DIR)/, $(addsuffix .o, $(FILES_SERVER)))
