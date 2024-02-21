@@ -8,6 +8,7 @@
 typedef struct s_client {
 	int id = 0;
 	std::string str = "";
+	std::array<int, 2> rectangle = {0, 0};
 }				t_client;
 
 class Server
@@ -24,7 +25,7 @@ class Server
 		Server( void );
 		~Server( void );
 
-		void bindSocket( int port );
+		void bindSocket( void );
 		void listenToClients( void );
 		void handleMessages( void );
 };

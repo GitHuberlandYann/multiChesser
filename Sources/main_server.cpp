@@ -3,12 +3,13 @@
 
 int main( int ac, char ** av )
 {
-	if (ac != 2) {
-		error("Error format: ./server <port>");
+	(void)av;
+	if (ac != 1) {
+		error("Error format: ./server");
 	}
 
 	Server server;
-	server.bindSocket(std::atoi(av[1]));
+	server.bindSocket();
 	server.listenToClients();
 	while (true) {
 		server.handleMessages();

@@ -1,4 +1,5 @@
 #include "Client.hpp"
+#include "Display.hpp"
 
 #include <arpa/inet.h> // htons
 #include <sys/socket.h> // connect, send, recv
@@ -6,7 +7,7 @@
 #include <unistd.h> // close
 #include <strings.h> // bcopy
 
-Client::Client( void )
+Client::Client( void ) : _inputs({0, 0}), _display(NULL)
 {
 	std::cout << "Hello World! - client" << std::endl;
 	_socket_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -29,7 +30,17 @@ Client::~Client( void )
 //                                Public                                      //
 // ************************************************************************** //
 
-void Client::connectSocket( std::string ip, int port )
+void Client::setDisplay( Display *display )
+{
+	_display = display;
+}
+
+void Client::setInputs( int horizontal, int vertical )
+{
+	_inputs = {horizontal, -vertical};
+}
+
+void Client::connectSocket( std::string ip )
 {
 	struct hostent *server = gethostbyname(ip.c_str());
 	if (!server) {
@@ -38,7 +49,7 @@ void Client::connectSocket( std::string ip, int port )
 
     struct sockaddr_in addr;
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(port);
+	addr.sin_port = htons(PORT);
 	bcopy((char *)server->h_addr, (char *)&addr.sin_addr.s_addr, server->h_length);
 	std::cout << "serv addr " << inet_ntoa(addr.sin_addr) << " port " << ntohs(addr.sin_port) << std::endl;
 
@@ -48,36 +59,18 @@ void Client::connectSocket( std::string ip, int port )
 
 	FD_ZERO(&_fds);
 	FD_SET(_socket_fd, &_fds); // put fd in fd set
-	FD_SET(STDIN_FILENO, &_fds); // put std::in in fd set
 }
 
 bool Client::handleMessages( void )
 {
+	// first send info, then server answers and we are not stuck on select
+	std::string msg = std::to_string(_inputs[0]) + " " + std::to_string(_inputs[1]) + " \n";
+	send(_socket_fd, msg.c_str(), msg.size(), 0);
+
 	fd_set rfds = _fds;
 
 	select(FD_SETSIZE, &rfds, NULL, NULL, NULL);
 
-	if (FD_ISSET(STDIN_FILENO, &rfds)) { // ping from std::cin
-		char buff[1024];
-		ssize_t n = read(STDIN_FILENO, buff, sizeof(buff));
-
-		if (n == -1 || n == 0) {
-			error("Fatal error input");
-		}
-		if (n == 1) {
-			return (false);
-		}
-
-		buff[n] = '\0';
-		// broadcast input to server
-		for (ssize_t j = 0; j < n; j++) {
-			_input_line += buff[j];
-			if (buff[j] == '\n') {
-				send(_socket_fd, &_input_line[0], _input_line.size(), 0);
-				_input_line = "";
-			}
-		}
-	}
 	if (FD_ISSET(_socket_fd, &rfds)) { // ping from server
 		char buff[1024];
 		ssize_t n = recv(_socket_fd, buff, sizeof(buff), 0);
@@ -86,15 +79,19 @@ bool Client::handleMessages( void )
 			error("Fatal error recv");
 		}
 
+		// std::cout << "handleMessages n is " << n << std::endl;
 		buff[n] = '\0';
-		// broadcast server msg to output
+		// parse server input
 		for (ssize_t j = 0; j < n; j++) {
 			_server_line += buff[j];
 			if (buff[j] == '\n') {
-				std::cout << _server_line << std::flush;
+				if (_display) {
+					_display->parseServerInput(_server_line);
+				}
 				_server_line = "";
 			}
 		}
 	}
+
 	return (true);
 }

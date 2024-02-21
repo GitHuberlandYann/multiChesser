@@ -27,7 +27,7 @@ Server::~Server( void )
 t_client Server::create_client( void )
 {
 	static int	id;
-	return {id++, ""};
+	return {++id, ""};
 }
 
 // broadcast msg to everyone on write set except sender
@@ -38,18 +38,18 @@ void Server::broadcast( int fd, std::string msg, fd_set *wfds )
 			send(i, &msg[0], msg.size(), 0);
 		}
 	}
-	std::cout << msg << std::flush;
+	// std::cout << "Boadcasted " << msg << std::flush;
 }
 
 // ************************************************************************** //
 //                                Public                                      //
 // ************************************************************************** //
 
-void Server::bindSocket( int port )
+void Server::bindSocket( void )
 {
 	struct sockaddr_in addr;
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(port);
+	addr.sin_port = htons(PORT);
 	// addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // localhost only
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	std::cout << "serv addr " << inet_ntoa(addr.sin_addr) << " port " << ntohs(addr.sin_port) << std::endl;
@@ -70,7 +70,7 @@ void Server::listenToClients( void )
 
 void Server::handleMessages( void )
 {
-	std::string msg;
+	bool modif = false;
 	fd_set rfds = _fds; // set read and write fds to current fds
 	fd_set wfds = _fds;
 	FD_CLR(_socket_fd, &wfds); // rm fd from write fds (we don't send ourselve a message)
@@ -81,12 +81,11 @@ void Server::handleMessages( void )
 		struct sockaddr_in addr;
 		socklen_t addr_len = sizeof(addr);
 		int cfd = accept(_socket_fd, (struct sockaddr *) &addr, &addr_len);
-		std::cout << "server: got connection from " << inet_ntoa(addr.sin_addr) << " port " << ntohs(addr.sin_port) << std::endl;
 		_clients[cfd] = create_client();
 		FD_SET(cfd, &_fds);
 
-		msg = "server: client " + std::to_string(_clients[cfd].id) + " just arrived\n";
-		broadcast(cfd, msg, &wfds);
+		send(cfd, "0 0 ", 4, 0);
+		std::cout << "server: client " << std::to_string(_clients[cfd].id) << ": got connection from " << inet_ntoa(addr.sin_addr) << " port " << ntohs(addr.sin_port) << std::endl;
 		return ;
 	}
 
@@ -100,24 +99,65 @@ void Server::handleMessages( void )
 		ssize_t n = recv(i, buff, sizeof(buff), 0);
 
 		if (n == -1 || n == 0) { // client leaves
-			msg = "server: client " + std::to_string(_clients[i].id) + " just left\n";
-			broadcast(i, msg, &wfds);
-			_clients[i].str = "";
+			std::cout << "server: client " << std::to_string(_clients[i].id) << " just left" << std::endl;
+			_clients[i] = {0, "", {0, 0}};
 			close(i);
 			FD_CLR(i, &_fds); // rm client from fd set
 			continue;
 		}
 
 		buff[n] = '\0';
-		// broadcast received msg after cutting the \n
+		// parse received message from client: "xOffset yOffset"
 		for (ssize_t j = 0; j < n; j++) {
 			t_client &c = _clients[i];
 			c.str += buff[j];
 			if (buff[j] == '\n') {
-				msg = "client " + std::to_string(c.id) + ": " + c.str;
-				broadcast(i, msg, &wfds),
+				// std::cout << "received from client " << c.str << std::flush;
+				modif = true;
+				int index = 0, x = 0, y = 0;
+				bool xSign = false, ySign = false;
+				if (c.str[index] == '-') {
+					xSign = true;
+					++index;
+				}
+				for (; isdigit(c.str[index]); ++index) x = x * 10 + c.str[index] - '0';
+				++index;
+				if (c.str[index] == '-') {
+					ySign = true;
+					++index;
+				}
+				for (; isdigit(c.str[index]); ++index) y = y * 10 + c.str[index] - '0';
+				x = c.rectangle[0] + ((xSign) ? -x : x);
+				if (x >= 0 && x < WIN_WIDTH - RECT_SIZE) {
+					c.rectangle[0] = x;
+				}
+				y = c.rectangle[1] + ((ySign) ? -y : y);
+				if (y >= 0 && y < WIN_HEIGHT - RECT_SIZE) {
+					c.rectangle[1] = y;
+				}
 				c.str = "";
 			}
 		}
+	}
+
+	if (!modif) {
+		return ;
+	}
+
+	// compute positions update to broadcast to all clients
+	// rectX rectY rect2X rect2Y rect3X rect3Y ...
+	std::string msg;
+	for (int i = 0; i < FD_SETSIZE; i++) {
+		if (!_clients[i].id) continue ;
+
+		// std::cout << "client " << _clients[i].id << " has rect " << _clients[i].rectangle[0] << ", " << _clients[i].rectangle[1] << std::endl;
+		msg += std::to_string(_clients[i].rectangle[0]) + " ";
+		msg += std::to_string(_clients[i].rectangle[1]) + " ";
+	}
+
+	if (msg[0]) {
+		// std::cout << "returning to clients: " << msg << std::endl;
+		msg += '\n';
+		broadcast(0, msg, &wfds);
 	}
 }
