@@ -31,6 +31,7 @@ int main( int ac, char **av )
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(std::atoi(av[2]));
 	bcopy((char *)server->h_addr, (char *)&addr.sin_addr.s_addr, server->h_length);
+	std::cout << "serv addr " << inet_ntoa(addr.sin_addr) << " port " << ntohs(addr.sin_port) << std::endl;
 
 	if (connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1) {
 		error("Fatal error connect");

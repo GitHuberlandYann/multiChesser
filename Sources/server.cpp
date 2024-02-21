@@ -46,7 +46,9 @@ int main( int ac, char **av )
     struct sockaddr_in addr;
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(std::atoi(av[1]));
-	addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+	// addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // localhost only
+	addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	std::cout << "serv addr " << inet_ntoa(addr.sin_addr) << " port " << ntohs(addr.sin_port) << std::endl;
 
 	if (bind(fd, (struct sockaddr *) &addr, sizeof(addr)) == -1) {
 		error("Fatal error bind");
@@ -70,7 +72,9 @@ int main( int ac, char **av )
 		select(FD_SETSIZE, &rfds, &wfds, NULL, NULL);
 		
 		if (FD_ISSET(fd, &rfds)) { // new client, our socket received a ping
-			int cfd = accept(fd, NULL, NULL);
+			socklen_t addr_len = sizeof(addr);
+			int cfd = accept(fd, (struct sockaddr *) &addr, &addr_len);
+			std::cout << "server: got connection from " << inet_ntoa(addr.sin_addr) << " port " << ntohs(addr.sin_port) << std::endl;
 			clients[cfd] = client_create();
 			FD_SET(cfd, &fds);
 
