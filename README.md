@@ -33,3 +33,9 @@ The program ./client can be launched several times from different terminals, one
 ## Libraries
 * [GLFW](https://github.com/glfw/glfw.git) is an Open Source, multi-platform library for OpenGL, OpenGL ES and Vulkan application development. It provides a simple, platform-independent API for creating windows, contexts and surfaces, reading input, handling events, etc.
 * [GLEW](https://github.com/nigels-com/glew.git) provides efficient run-time mechanisms for determining which OpenGL extensions are supported on the target platform.
+
+## Assets
+Assets are coming from [chess.com]/(https://chess.com).
+```
+$ curl https://www.chess.com/chess-themes/pieces/neo/300/{w,b}{k,q,p,n,b,r}.png
+```

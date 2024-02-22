@@ -1,16 +1,28 @@
 #include "Display.hpp"
 #include "utils.hpp"
 
+#include "SOIL/SOIL.h"
+typedef struct {
+	unsigned char *content;
+	int width;
+	int height;
+}				t_tex;
+
 Display::Display( void )
 	: _window(NULL), _winWidth(WIN_WIDTH), _winHeight(WIN_HEIGHT),
-		_state(STATE::MENU)
+		_texture(NULL), _client(NULL), _state(STATE::MENU)
 {
-
+	_chess = new Chess();
 }
 
 Display::~Display( void )
 {
 	std::cout << "Destructor of display called" << std::endl;
+
+	if (_texture) {
+		glDeleteTextures(1, _texture);
+		delete [] _texture;
+	}
 
 	glDeleteProgram(_shaderProgram);
 
@@ -19,6 +31,9 @@ Display::~Display( void )
 
 	glfwMakeContextCurrent(NULL);
     glfwTerminate();
+
+	delete _chess;
+	delete _client;
 	check_glstate("Display successfully destructed", true);
 }
 
@@ -149,7 +164,8 @@ void Display::create_shaders( void )
 
 	glBindFragDataLocation(_shaderProgram, 0, "outColor");
 
-	glBindAttribLocation(_shaderProgram, 0, "position");
+	glBindAttribLocation(_shaderProgram, SPECATTRIB, "specifications");
+	glBindAttribLocation(_shaderProgram, POSATTRIB, "position");
 
 	glLinkProgram(_shaderProgram);
 	glUseProgram(_shaderProgram);
@@ -171,37 +187,111 @@ void Display::setup_communication_shaders( void )
 	check_glstate("VAO and VBO", false);
 }
 
+void Display::loadSubTextureArray( int layer, std::string texture_file )
+{
+	// load image
+	t_tex img;
+	img.content = SOIL_load_image(texture_file.c_str(), &img.width, &img.height, 0, SOIL_LOAD_RGBA);
+	if (!img.content) {
+		std::cerr << "failed to load image " << texture_file << " because:" << std::endl << SOIL_last_result() << std::endl;
+		exit(1);
+	}
+
+	if (img.width != 300 || img.height != 300) {
+		std::cerr << texture_file << ": image size not 300x300 but " << img.width << "x" << img.height << std::endl;
+		exit(1);
+	}
+	// Upload pixel data.
+	// The first 0 refers to the mipmap level (level 0, since there's only 1)
+	// The following 2 zeroes refers to the x and y offsets in case you only want to specify a subrectangle.
+	// 300x300 size of rect, 1 = depth of layer
+	glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, layer, img.width, img.height, 1, GL_RGBA, GL_UNSIGNED_BYTE, img.content);
+			
+	// set settings for texture wraping and size modif
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	SOIL_free_image_data(img.content);
+
+	check_glstate("Succesfully loaded " + texture_file + " to shader", true);
+}
+
+void Display::load_texture( void )
+{
+	_texture = new GLuint[1];
+	glGenTextures(1, _texture);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, _texture[0]);
+
+	// alocate pixel data
+	// mipmap level set to 1
+	// works because all images are 300x300
+	// layerCount is 12 (6 whites and 6 black pieces)
+	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGBA8, 300, 300, 14);
+	loadSubTextureArray(0, "Resources/back_black.png");
+	loadSubTextureArray(1, "Resources/back_white.png");
+	loadSubTextureArray(2, "Resources/bk.png");
+	loadSubTextureArray(3, "Resources/bq.png");
+	loadSubTextureArray(4, "Resources/br.png");
+	loadSubTextureArray(5, "Resources/bb.png");
+	loadSubTextureArray(6, "Resources/bn.png");
+	loadSubTextureArray(7, "Resources/bp.png");
+	loadSubTextureArray(8, "Resources/wk.png");
+	loadSubTextureArray(9, "Resources/wq.png");
+	loadSubTextureArray(10, "Resources/wr.png");
+	loadSubTextureArray(11, "Resources/wb.png");
+	loadSubTextureArray(12, "Resources/wn.png");
+	loadSubTextureArray(13, "Resources/wp.png");
+	glUniform1i(glGetUniformLocation(_shaderProgram, "pieces"), 0);
+	check_glstate("texture_2D_array done", true);
+}
+
 void Display::draw_rectangles( void )
 {
-	size_t rSize = _rectangles.size();
-	if (rSize) {
+	if (_rectangles.size()) {
 		std::vector<int> vertices;
+		_chess->drawBoard(vertices, 30, 30, 240, 240);
+		int index = 0;
 		for (auto pos : _rectangles) {
+			vertices.push_back(0 + (0 << 1) + (index << 2));
 			vertices.push_back(pos[0]);
 			vertices.push_back(pos[1]);
+			vertices.push_back(1 + (0 << 1) + (index << 2));
 			vertices.push_back(pos[0] + RECT_SIZE);
 			vertices.push_back(pos[1]);
+			vertices.push_back(0 + (1 << 1) + (index << 2));
 			vertices.push_back(pos[0]);
 			vertices.push_back(pos[1] + RECT_SIZE);
 
+			vertices.push_back(1 + (0 << 1) + (index << 2));
 			vertices.push_back(pos[0] + RECT_SIZE);
 			vertices.push_back(pos[1]);
+			vertices.push_back(1 + (1 << 1) + (index << 2));
 			vertices.push_back(pos[0] + RECT_SIZE);
 			vertices.push_back(pos[1] + RECT_SIZE);
+			vertices.push_back(0 + (1 << 1) + (index << 2));
 			vertices.push_back(pos[0]);
 			vertices.push_back(pos[1] + RECT_SIZE);
+			++index;
+			// std::cout << "rect at " << pos[0] << ", " << pos[1] << std::endl;
 		}
 		glUseProgram(_shaderProgram);
 		glBindVertexArray(_vao);
 
 		glBindBuffer(GL_ARRAY_BUFFER, _vbo);
-		glBufferData(GL_ARRAY_BUFFER, rSize * 12 * sizeof(GLint), &(vertices[0]), GL_STATIC_DRAW);
+		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLint), &(vertices[0]), GL_STATIC_DRAW);
 
-		glEnableVertexAttribArray(0);
-		glVertexAttribIPointer(0, 2, GL_INT, 2 * sizeof(GLint), 0);
+		glEnableVertexAttribArray(SPECATTRIB);
+		glVertexAttribIPointer(SPECATTRIB, 1, GL_INT, 3 * sizeof(GLint), 0);
+		glEnableVertexAttribArray(POSATTRIB);
+		glVertexAttribIPointer(POSATTRIB, 2, GL_INT, 3 * sizeof(GLint), (void *)(1 * sizeof(GLint)));
 
 		check_glstate("Display::draw_rectangles", false);
-		glDrawArrays(GL_TRIANGLES, 0, rSize * 12);
+		glDrawArrays(GL_TRIANGLES, 0, vertices.size() / 3);
+		// std::cout << "displaying resctangless " << vertices.size() << std::endl;
 	}
 }
 
@@ -256,6 +346,7 @@ void Display::start( void )
 	setup_window();
 	create_shaders();
 	setup_communication_shaders();
+	load_texture();
 	main_loop();
 }
 

@@ -4,7 +4,7 @@ OBJS_DIR		= Objs
 SRCS_DIR		= Sources
 
 FILES_SERVER	= main_server Server utils
-FILES_CLIENT	= main_client Display Client utils
+FILES_CLIENT	= main_client Chess Display Client utils
 
 SRCS			= $(addprefix $(SRCS_DIR)/, $(addsuffix .cpp, $(FILES_SERVER)))
 OBJS 			= $(addprefix $(OBJS_DIR)/, $(addsuffix .o, $(FILES_SERVER)))
@@ -17,7 +17,7 @@ CC 			= clang++
 CPPFLAGS 	= -Wall -Wextra -Werror -O3 -std=c++17
 SAN 		= -fsanitize=address -g3
 INCLUDES	= -I Includes -I Libs/glfw/include
-LDFLAGS		= Libs/glfw/src/libglfw3.a
+LDFLAGS		= Libs/glfw/src/libglfw3.a Libs/SOIL/build/lib/libSOIL.a
 
 # ===---===---===---===---===---===---===---===---===---===---===---===---
 
@@ -35,10 +35,12 @@ $(OBJS_DIR):
 	@mkdir -p $(OBJS_DIR)
 
 setup:
+	cd Libs/SOIL && ./configure && make
 	cd Libs/glfw && cmake . && make
 	cd Libs/glew/build && cmake ./cmake && make
 
 cleanLibs:
+	cd Libs/SOIL && make clean
 	cd Libs/glew && make clean
 	cd Libs/glfw && make clean
 
