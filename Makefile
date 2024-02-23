@@ -16,7 +16,7 @@ CLI_OBJS 		= $(addprefix $(OBJS_DIR)/, $(addsuffix .o, $(FILES_CLIENT)))
 CC 			= clang++
 CPPFLAGS 	= -Wall -Wextra -Werror -O3 -std=c++17
 SAN 		= -fsanitize=address -g3
-INCLUDES	= -I Includes -I Libs/glfw/include
+INCLUDES	= -I Includes -I Libs/glfw/include -I Libs/SOIL/build/include
 LDFLAGS		= Libs/glfw/src/libglfw3.a Libs/SOIL/build/lib/libSOIL.a
 
 # ===---===---===---===---===---===---===---===---===---===---===---===---
@@ -24,7 +24,7 @@ LDFLAGS		= Libs/glfw/src/libglfw3.a Libs/SOIL/build/lib/libSOIL.a
 ifeq ($(shell uname), Linux)
 LDFLAGS		+= -L Libs/glew/build `pkg-config --static --libs glew` -lGL -lX11 -lpthread -lXrandr -lXi -ldl 
 else
-LDFLAGS		+= -framework OpenGl -framework AppKit -framework IOkit Libs/mac/libGLEW.a # todo check if glew compiles on mac
+LDFLAGS		+= -framework OpenGl -framework AppKit -framework IOkit -L Libs/glew/build `pkg-config --static --libs glew`
 endif
 
 # # ===---===---===---===---===---===---===---===---===---===---===---===---
