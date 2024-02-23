@@ -10,7 +10,7 @@ typedef struct {
 
 Display::Display( void )
 	: _window(NULL), _winWidth(WIN_WIDTH), _winHeight(WIN_HEIGHT),
-		_texture(NULL), _client(NULL), _state(STATE::MENU)
+		_texture(NULL), _client(NULL), _state(STATE::MENU), _ip("localhost")
 {
 	_chess = new Chess();
 }
@@ -312,7 +312,7 @@ void Display::main_loop( void )
 				if (glfwGetKey(_window, GLFW_KEY_SPACE) == GLFW_PRESS) {
 					_client = new Client();
 					_client->setDisplay(this);
-					_client->connectSocket("localhost");
+					_client->connectSocket(_ip);
 					// std::cout << "debug after connect" << std::endl;
 					_state = STATE::GAME;
 				}
@@ -340,6 +340,11 @@ void Display::main_loop( void )
 // ************************************************************************** //
 //                                Public                                      //
 // ************************************************************************** //
+
+void Display::setIP( std::string ip )
+{
+	_ip = ip;
+}
 
 void Display::start( void )
 {

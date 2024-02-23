@@ -34,6 +34,7 @@ class Display
 		Chess *_chess;
 		std::vector<std::array<int, 2>> _rectangles;
 		int _state;
+		std::string _ip;
 
 		GLuint createShaderProgram( std::string vertex, std::string geometry, std::string fragment );
 		void check_glstate( std::string str, bool displayDebug );
@@ -50,6 +51,7 @@ class Display
 		Display( void );
 		~Display( void );
 
+		void setIP( std::string ip );
 		void start( void );
 		void parseServerInput( std::string str );
 };

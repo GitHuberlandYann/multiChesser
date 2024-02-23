@@ -2,14 +2,16 @@
 
 int main( int ac, char **av )
 {
-	(void)av;
-	if (ac != 1) {
-		error("Error format: ./client");
+	if (ac > 2) {
+		error("Error format: ./client [ip address]");
 	}
 
 	std::cout << "Hello World! - client" << std::endl;
 
 	Display display;
+	if (ac == 2) {
+		display.setIP(av[1]);
+	}
 	display.start();
 	return (0);
 }
