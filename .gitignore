@@ -26,6 +26,9 @@
 *.a
 *.lib
 
+# Libs
+Libs/glew-2.2.0
+
 # Logs
 *.log
 

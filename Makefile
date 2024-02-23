@@ -16,15 +16,15 @@ CLI_OBJS 		= $(addprefix $(OBJS_DIR)/, $(addsuffix .o, $(FILES_CLIENT)))
 CC 			= clang++
 CPPFLAGS 	= -Wall -Wextra -Werror -O3 -std=c++17
 SAN 		= -fsanitize=address -g3
-INCLUDES	= -I Includes -I Libs/glfw/include -I Libs/SOIL/build/include
-LDFLAGS		= Libs/glfw/src/libglfw3.a Libs/SOIL/build/lib/libSOIL.a
+INCLUDES	= -I Includes -I Libs/glfw/include -I Libs/SOIL/build/include -I Libs/glew-2.2.0/include
+LDFLAGS		= Libs/glfw/src/libglfw3.a Libs/glew-2.2.0/build/lib/libGLEW.a Libs/SOIL/build/lib/libSOIL.a
 
 # ===---===---===---===---===---===---===---===---===---===---===---===---
 
 ifeq ($(shell uname), Linux)
-LDFLAGS		+= -L Libs/glew/build `pkg-config --static --libs glew` -lGL -lX11 -lpthread -lXrandr -lXi -ldl 
+LDFLAGS		+= -lGL -lX11 -lpthread -lXrandr -lXi -ldl #-L Libs/glew/build `pkg-config --static --libs glew` 
 else
-LDFLAGS		+= -framework OpenGl -framework AppKit -framework IOkit -L Libs/glew/build `pkg-config --static --libs glew`
+LDFLAGS		+= -framework OpenGl -framework AppKit -framework IOkit
 endif
 
 # # ===---===---===---===---===---===---===---===---===---===---===---===---
@@ -37,11 +37,11 @@ $(OBJS_DIR):
 setup:
 	cd Libs/SOIL && ./configure && make
 	cd Libs/glfw && cmake . && make
-	cd Libs/glew/build && cmake ./cmake && make
+	cd Libs/glew-2.2.0/build && cmake ./cmake && make
 
 cleanLibs:
 	cd Libs/SOIL && make clean
-	cd Libs/glew && make clean
+	cd Libs/glew-2.2.0 && make clean
 	cd Libs/glfw && make clean
 
 $(SER_NAME): $(OBJS)
