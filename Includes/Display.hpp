@@ -32,8 +32,9 @@ class Display
 		GLuint *_texture;
 		Client *_client;
 		Chess *_chess;
-		std::vector<std::array<int, 2>> _rectangles;
 		int _state;
+		bool _mouse_pressed;
+		std::array<int, 2> _selected_piece; // {piece::value, starting_square}
 		std::string _ip;
 
 		GLuint createShaderProgram( std::string vertex, std::string geometry, std::string fragment );
@@ -44,6 +45,8 @@ class Display
 		void setup_communication_shaders( void );
 		void loadSubTextureArray( int layer, std::string texture_file );
 		void load_texture( void );
+
+		void handleInputs( void );
 		void draw_rectangles( void );
 		void main_loop( void );
 

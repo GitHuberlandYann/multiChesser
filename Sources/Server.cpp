@@ -4,7 +4,7 @@
 #include <sys/socket.h> // listen, accept, send, recv
 #include <unistd.h> // close
 
-Server::Server( void )
+Server::Server( void ) : _chess(new Chess())
 {
 	std::cout << "Server started, waiting for connections..." << std::endl;
 	_socket_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -16,6 +16,7 @@ Server::Server( void )
 Server::~Server( void )
 {
 	close(_socket_fd);
+	delete _chess;
 	std::cout << "Server closed" << std::endl;
 }
 
@@ -84,7 +85,7 @@ void Server::handleMessages( void )
 		_clients[cfd] = create_client();
 		FD_SET(cfd, &_fds);
 
-		send(cfd, "0 0 ", 4, 0);
+		modif = true;
 		std::cout << "server: client " << std::to_string(_clients[cfd].id) << ": got connection from " << inet_ntoa(addr.sin_addr) << " port " << ntohs(addr.sin_port) << std::endl;
 		return ;
 	}
@@ -100,6 +101,7 @@ void Server::handleMessages( void )
 
 		if (n == -1 || n == 0) { // client leaves
 			std::cout << "server: client " << std::to_string(_clients[i].id) << " just left" << std::endl;
+			// modif = true;
 			_clients[i] = {0, "", {0, 0}};
 			close(i);
 			FD_CLR(i, &_fds); // rm client from fd set
@@ -127,14 +129,10 @@ void Server::handleMessages( void )
 					++index;
 				}
 				for (; isdigit(c.str[index]); ++index) y = y * 10 + c.str[index] - '0';
-				x = c.rectangle[0] + ((xSign) ? -x : x);
-				if (x >= 0 && x < WIN_WIDTH - RECT_SIZE) {
-					c.rectangle[0] = x;
-				}
-				y = c.rectangle[1] + ((ySign) ? -y : y);
-				if (y >= 0 && y < WIN_HEIGHT - RECT_SIZE) {
-					c.rectangle[1] = y;
-				}
+				int src = (xSign) ? -x : x;
+				int dst = (ySign) ? -y : y;
+				// std::cout << "move piece " << src << ", " << dst << std::endl;
+				_chess->movePiece(src, dst);
 				c.str = "";
 			}
 		}
@@ -144,20 +142,5 @@ void Server::handleMessages( void )
 		return ;
 	}
 
-	// compute positions update to broadcast to all clients
-	// rectX rectY rect2X rect2Y rect3X rect3Y ...
-	std::string msg;
-	for (int i = 0; i < FD_SETSIZE; i++) {
-		if (!_clients[i].id) continue ;
-
-		// std::cout << "client " << _clients[i].id << " has rect " << _clients[i].rectangle[0] << ", " << _clients[i].rectangle[1] << std::endl;
-		msg += std::to_string(_clients[i].rectangle[0]) + " ";
-		msg += std::to_string(_clients[i].rectangle[1]) + " ";
-	}
-
-	if (msg[0]) {
-		// std::cout << "returning to clients: " << msg << std::endl;
-		msg += '\n';
-		broadcast(0, msg, &wfds);
-	}
+	broadcast(0, _chess->getBoard(), &wfds);
 }

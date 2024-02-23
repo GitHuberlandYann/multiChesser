@@ -12,8 +12,7 @@ class Client
 	private:
 		int _socket_fd;
 		fd_set _fds;
-		std::string _input_line, _server_line;
-		std::array<int, 2> _inputs;
+		std::string _server_line, _msg;
 		Display *_display;
 
 	public:
@@ -21,8 +20,8 @@ class Client
 		~Client( void );
 
 		void setDisplay( Display *display );
-		void setInputs( int horizontal, int vertical );
 		void connectSocket( std::string ip );
+		void setMsg( int src, int dst );
 		bool handleMessages( void );
 };
 

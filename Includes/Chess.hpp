@@ -1,6 +1,7 @@
 #ifndef CHESS_HPP
 # define CHESS_HPP
 
+# include <string>
 # include <vector>
 # include <array>
 
@@ -19,6 +20,7 @@ namespace PIECES
 		PAWN,
 		WHITE = (1 << 3)
 	};
+	const std::array<std::string, 7> name = {"Empty", "King", "Queen", "Rook", "Bishop", "Knight", "Pawn"};
 
 	/* board indexes are
 	8	56 57 58 59 60 61 62 63
@@ -51,7 +53,7 @@ class Chess
 		std::vector<std::array<char, 64>> _history;
 		bool _turn;
 
-		void addCapture( int row, int col );
+		bool addCapture( int row, int col );
 		void addKingCaptures( int index );
 		void addQueenCaptures( int index );
 		void addRookCaptures( int index );
@@ -60,15 +62,19 @@ class Chess
 		void addPawnCaptures( int index );
 		bool legalBoard( void );
 
-		void drawSquare( std::vector<int> &vertices, int type, int startX, int startY, int width, int height);
+		std::string indexToStr( int index );
 
 	public:
 		Chess( void );
 		~Chess( void );
 
-		std::array<char, 64> getBoard( void );
+		std::string getBoard( void );
 		void setBoard( std::string str );
-		void drawBoard( std::vector<int> &vertices, int startX, int startY, int width, int height );
+		void setCaptures( int index );
+		void drawSquare( std::vector<int> &vertices, int type, int startX, int startY, int width, int height);
+		void drawBoard( std::vector<int> &vertices, int except, int startX, int startY, int width, int height );
+		std::array<int, 2> getSelectedSquare( double mouseX, double mouseY);
+		void movePiece( int src, int dst );
 };
 
 #endif

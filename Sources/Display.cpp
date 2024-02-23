@@ -10,7 +10,8 @@ typedef struct {
 
 Display::Display( void )
 	: _window(NULL), _winWidth(WIN_WIDTH), _winHeight(WIN_HEIGHT),
-		_texture(NULL), _client(NULL), _state(STATE::MENU), _ip("localhost")
+		_texture(NULL), _client(NULL), _state(STATE::MENU), _mouse_pressed(false),
+		_selected_piece({PIECES::EMPTY, -1}), _ip("localhost")
 {
 	_chess = new Chess();
 }
@@ -249,34 +250,36 @@ void Display::load_texture( void )
 	check_glstate("texture_2D_array done", true);
 }
 
+void Display::handleInputs( void )
+{
+	double mouseX, mouseY;
+	glfwGetCursorPos(_window, &mouseX, &mouseY);
+	if (!_mouse_pressed && glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+		_mouse_pressed = true;
+		_selected_piece = _chess->getSelectedSquare(mouseX, mouseY);
+		std::cout << "piece " << _selected_piece[0] << " at " << _selected_piece[1] << std::endl;
+	} else if (glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
+		_mouse_pressed = false;
+		if (_selected_piece[0] != PIECES::EMPTY) {
+			_client->setMsg(_selected_piece[1], _chess->getSelectedSquare(mouseX, mouseY)[1]);
+			_selected_piece = {PIECES::EMPTY, -1};
+		}
+	}
+
+	if (glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
+		_chess->setCaptures(_chess->getSelectedSquare(mouseX, mouseY)[1]);
+	}
+}
+
 void Display::draw_rectangles( void )
 {
-	if (_rectangles.size()) {
+	if (true) {
 		std::vector<int> vertices;
-		_chess->drawBoard(vertices, 30, 30, 240, 240);
-		int index = 0;
-		for (auto pos : _rectangles) {
-			vertices.push_back(0 + (0 << 1) + (index << 2));
-			vertices.push_back(pos[0]);
-			vertices.push_back(pos[1]);
-			vertices.push_back(1 + (0 << 1) + (index << 2));
-			vertices.push_back(pos[0] + RECT_SIZE);
-			vertices.push_back(pos[1]);
-			vertices.push_back(0 + (1 << 1) + (index << 2));
-			vertices.push_back(pos[0]);
-			vertices.push_back(pos[1] + RECT_SIZE);
-
-			vertices.push_back(1 + (0 << 1) + (index << 2));
-			vertices.push_back(pos[0] + RECT_SIZE);
-			vertices.push_back(pos[1]);
-			vertices.push_back(1 + (1 << 1) + (index << 2));
-			vertices.push_back(pos[0] + RECT_SIZE);
-			vertices.push_back(pos[1] + RECT_SIZE);
-			vertices.push_back(0 + (1 << 1) + (index << 2));
-			vertices.push_back(pos[0]);
-			vertices.push_back(pos[1] + RECT_SIZE);
-			++index;
-			// std::cout << "rect at " << pos[0] << ", " << pos[1] << std::endl;
+		_chess->drawBoard(vertices, _selected_piece[1], 30, 30, 240, 240);
+		if (_selected_piece[0] != PIECES::EMPTY) {
+			double mouseX, mouseY;
+			glfwGetCursorPos(_window, &mouseX, &mouseY);
+			_chess->drawSquare(vertices, 1 + (_selected_piece[0] & 0x7) + 6 * ((_selected_piece[0] & PIECES::WHITE) == PIECES::WHITE), mouseX - 15, mouseY - 15, 30, 30);
 		}
 		glUseProgram(_shaderProgram);
 		glBindVertexArray(_vao);
@@ -319,13 +322,11 @@ void Display::main_loop( void )
 				break ;
 			case STATE::GAME:
 				// std::cout << "debug time" << std::endl;
-				_client->setInputs(glfwGetKey(_window, GLFW_KEY_RIGHT) - glfwGetKey(_window, GLFW_KEY_LEFT),
-						glfwGetKey(_window, GLFW_KEY_UP) - glfwGetKey(_window, GLFW_KEY_DOWN));
+				handleInputs();
 				if (!_client->handleMessages()) {
 					delete _client;
 					_client = NULL;
 					_state = STATE::GAME;
-					_rectangles.clear();
 				}
 				// std::cout << "over" << std::endl;
 				break ;
@@ -357,29 +358,7 @@ void Display::start( void )
 
 void Display::parseServerInput( std::string str )
 {
-	int index = 0, x, y;
-	bool xSign, ySign;
-	_rectangles.clear();
-	for (; str[index] && str[index] != '\n'; ++index) {
-		x = 0;
-		y = 0;
-		xSign = false;
-		if (str[index] == '-') {
-			xSign = true;
-			++index;
-		}
-		for (; isdigit(str[index]); ++index) {
-			x = x * 10 + str[index] - '0';
-		}
-		++index;
-		ySign = false;
-		if (str[index] == '-') {
-			ySign = true;
-			++index;
-		}
-		for (; isdigit(str[index]); ++index) {
-			y = y * 10 + str[index] - '0';
-		}
-		_rectangles.push_back({(xSign) ? -x : x, (ySign) ? -y : y});
-	}
+	// std::cout << "parse input" << std::endl;
+	_chess->setBoard(str);
+	_chess->setCaptures(-1);
 }

@@ -7,7 +7,7 @@
 #include <unistd.h> // close
 #include <strings.h> // bcopy
 
-Client::Client( void ) : _inputs({0, 0}), _display(NULL)
+Client::Client( void ) : _msg(""), _display(NULL)
 {
 	std::cout << "Hello World! - client" << std::endl;
 	_socket_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -35,11 +35,6 @@ void Client::setDisplay( Display *display )
 	_display = display;
 }
 
-void Client::setInputs( int horizontal, int vertical )
-{
-	_inputs = {horizontal, -vertical};
-}
-
 void Client::connectSocket( std::string ip )
 {
 	struct hostent *server = gethostbyname(ip.c_str());
@@ -61,22 +56,36 @@ void Client::connectSocket( std::string ip )
 	FD_SET(_socket_fd, &_fds); // put fd in fd set
 }
 
+void Client::setMsg( int src, int dst )
+{
+	if (src < 0 || src >= 64 || dst < 0 || dst >= 64 || src == dst) {
+		return ;
+	}
+	_msg = std::to_string(src) + " " + std::to_string(dst) + " \n";
+}
+
 bool Client::handleMessages( void )
 {
-	// first send info, then server answers and we are not stuck on select
-	std::string msg = std::to_string(_inputs[0]) + " " + std::to_string(_inputs[1]) + " \n";
-	send(_socket_fd, msg.c_str(), msg.size(), 0);
+	fd_set rfds = _fds, wfds = _fds;
 
-	fd_set rfds = _fds;
+	select(FD_SETSIZE, &rfds, &wfds, NULL, NULL);
 
-	select(FD_SETSIZE, &rfds, NULL, NULL, NULL);
+	if (_msg[0] && FD_ISSET(_socket_fd, &wfds)) {
+		send(_socket_fd, _msg.c_str(), _msg.size(), 0);
+		// std::cout << "sent to server: " << _msg << std::flush;
+		_msg = "";
+	}
 
 	if (FD_ISSET(_socket_fd, &rfds)) { // ping from server
+		// std::cout << "PING FROM SERVER" << std::endl;
 		char buff[1024];
 		ssize_t n = recv(_socket_fd, buff, sizeof(buff), 0);
 
 		if (n == -1 || n == 0) {
 			error("Fatal error recv");
+		}
+		if (n != 65) {
+			error("Fatal error Client::handleMessage recv size if " + std::to_string(n));
 		}
 
 		// std::cout << "handleMessages n is " << n << std::endl;
