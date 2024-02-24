@@ -84,9 +84,6 @@ bool Client::handleMessages( void )
 		if (n == -1 || n == 0) {
 			error("Fatal error recv");
 		}
-		if (n != 65) {
-			error("Fatal error Client::handleMessage recv size if " + std::to_string(n));
-		}
 
 		// std::cout << "handleMessages n is " << n << std::endl;
 		buff[n] = '\0';

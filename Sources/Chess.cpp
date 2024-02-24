@@ -2,7 +2,7 @@
 #include <iostream>
 
 Chess::Chess( void )
-	: _board(PIECES::board_init), _turn(TURN_WHITE)
+	: _board(PIECES::board_init), _castle_state("KQkq"), _en_passant("-"), _half_moves(0), _full_moves(1), _turn(TURN_WHITE)
 {
 	_captured.fill(false);
 }
@@ -18,13 +18,13 @@ Chess::~Chess( void )
 
 // set _captured array to true if piece can move to square
 // then return whether piece can move further (used by rooks and bishops)
-bool Chess::addCapture( int row, int col )
+bool Chess::addCapture( int row, int col, bool empty_allowed, bool capture_allowed )
 {
 	if (row < 0 || row >= 8 || col < 0 || col >= 8) {
 		return (false);
 	}
 	int offset = (row << 3) + col, piece = _board[offset];
-	if (piece == PIECES::EMPTY || (piece & PIECES::WHITE) != _turn * PIECES::WHITE) {
+	if ((piece == PIECES::EMPTY && empty_allowed) || (capture_allowed && ((_turn == TURN_WHITE) ? islower(piece) : isupper(piece)))) {
 		_captured[offset] = true;
 		return (piece == PIECES::EMPTY);
 	}
@@ -37,6 +37,23 @@ void Chess::addKingCaptures( int index )
 	for (int r = -1; r <= 1; ++r) {
 		for (int c = -1; c <= 1; ++c) {
 			addCapture(row + r, col + c);
+		}
+	}
+}
+
+void Chess::addKingLegalMoves( int index )
+{
+	addKingCaptures(index);
+	char king_side = (_turn == TURN_WHITE) ? 'K' : 'k';
+	if (_castle_state.find(king_side) != std::string::npos) {
+		if (_board[index + 1] == PIECES::EMPTY && _board[index + 2] == PIECES::EMPTY) {
+			_captured[index + 2] = true;
+		}
+	}
+	char queen_side = (_turn == TURN_WHITE) ? 'Q' : 'q';
+	if (_castle_state.find(queen_side) != std::string::npos) {
+		if (_board[index - 1] == PIECES::EMPTY && _board[index - 2] == PIECES::EMPTY) {
+			_captured[index - 2] = true;
 		}
 	}
 }
@@ -78,11 +95,6 @@ void Chess::addBishopCaptures( int index )
 	for (int row = rowi + 1, col = coli + 1; row < 8 && col < 8; ++row, ++col) {
 		if (!addCapture(row, col)) break ;
 	}
-	// int row = index >> 3, col = index & 0x7;
-	// for (int diag = -7; diag < 7; ++diag) {
-	// 	addCapture(row + diag, col + diag);
-	// 	addCapture(row + diag, col - diag);
-	// }
 }
 
 void Chess::addKnightCaptures( int index )
@@ -101,8 +113,27 @@ void Chess::addKnightCaptures( int index )
 void Chess::addPawnCaptures( int index )
 {
 	int row = index >> 3, col = index & 0x7;
-	addCapture(row + ((_turn == TURN_WHITE) ? 1 : -1), col - 1);
-	addCapture(row + ((_turn == TURN_WHITE) ? 1 : -1), col + 1);
+	addCapture(row + ((_turn == TURN_WHITE) ? -1 : 1), col - 1);
+	addCapture(row + ((_turn == TURN_WHITE) ? -1 : 1), col + 1);
+}
+
+void Chess::addPawnLegalMoves( int index )
+{
+	int row = index >> 3, col = index & 0x7;
+	bool front = addCapture(row + ((_turn == TURN_WHITE) ? -1 : 1), col, true, false); // 1 forward
+	if (row == ((_turn == TURN_WHITE) ? 6 : 1)) {
+		if (front) {
+			addCapture(row + ((_turn == TURN_WHITE) ? -2 : 2), col, true, false); // 2 forward if first move
+		}
+	} else if (row == ((_turn == TURN_WHITE) ? 3 : 4)) { // en passant
+		if (_en_passant == indexToStr(index + 1 + ((_turn == TURN_WHITE) ? -8 : 8))) {
+			addCapture(row + ((_turn == TURN_WHITE) ? -1 : 1), col + 1);
+		} else if (_en_passant == indexToStr(index - 1 + ((_turn == TURN_WHITE) ? -8 : 8))) {
+			addCapture(row + ((_turn == TURN_WHITE) ? -1 : 1), col - 1);
+		}
+	}
+	addCapture(row + ((_turn == TURN_WHITE) ? -1 : 1), col - 1, false); // diag, only if enemy piece there
+	addCapture(row + ((_turn == TURN_WHITE) ? -1 : 1), col + 1, false);
 }
 
 // determines whether current board is a legal position, based on whose turn it is to play
@@ -111,16 +142,16 @@ bool Chess::legalBoard( void )
 {
 	int index = -1, king_pos = -1;
 	_captured.fill(false);
-	_turn = !_turn; // we tmp switch turn to simulate enemy's movement
+	_turn = (_turn == TURN_WHITE) ? TURN_BLACK : TURN_WHITE; // we tmp switch turn to simulate enemy's movement
 	for (auto piece : _board) {
 		++index;
-		if ((piece & PIECES::WHITE) != _turn * PIECES::WHITE) {
-			if ((piece & 0x7) == PIECES::KING) {
+		if ((_turn == TURN_WHITE) ? islower(piece) : isupper(piece)) {
+			if (tolower(piece) == PIECES::KING) {
 				king_pos = index;
 			}
 			continue ;
 		}
-		switch (piece & 0x7) {
+		switch (tolower(piece)) {
 			case PIECES::EMPTY:
 				continue ;
 			case PIECES::KING:
@@ -143,7 +174,7 @@ bool Chess::legalBoard( void )
 				break ;
 		}
 	}
-	_turn = !_turn;
+	_turn = (_turn == TURN_WHITE) ? TURN_BLACK : TURN_WHITE;
 	if (king_pos == -1) {
 		std::cerr << "king missing from board" << std::endl;
 		return (false);
@@ -158,9 +189,12 @@ bool Chess::legalBoard( void )
 
 std::string Chess::indexToStr( int index )
 {
+	if (index < 0 || index >= 64) {
+		return ("xx");
+	}
 	std::string res = "a0";
 	res[0] = static_cast<char>((index & 0x7) + 'a');
-	res[1] = static_cast<char>((index >> 3) + '1');
+	res[1] = static_cast<char>((7 - (index >> 3)) + '1');
 	return (res);
 }
 
@@ -168,24 +202,83 @@ std::string Chess::indexToStr( int index )
 //                                Public                                      //
 // ************************************************************************** //
 
-// getBoard and setBoard must be in synch
-std::string Chess::getBoard( void )
+int Chess::texIndex( char piece )
+{
+	int res = isupper(piece) ? 2 : 8;
+	switch (tolower(piece)) {
+		case PIECES::KING:
+			return (res + 0);
+		case PIECES::QUEEN:
+			return (res + 1);
+		case PIECES::ROOK:
+			return (res + 2);
+		case PIECES::BISHOP:
+			return (res + 3);
+		case PIECES::KNIGHT:
+			return (res + 4);
+		case PIECES::PAWN:
+			return (res + 5);
+	}
+	return (0);
+}
+
+// Forsyth-Edwards Notation rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+std::string Chess::getFEN( void )
 {
 	std::string res;
+	int cnt = 0;
 
 	for (int i = 0; i < 64; ++i) {
 		// std::cout << "in get board " << i << ": " << static_cast<int>(_board[i]) << std::endl;
-		res += _board[i] + 32;
+		if (_board[i] == PIECES::EMPTY) {
+			++cnt;
+		} else {
+			if (cnt) {
+				res += static_cast<char>('0' + cnt);
+				cnt = 0;
+			}
+			res += _board[i];
+		}
+		if ((i & 0x7) == 7) {
+			if (cnt) {
+				res += static_cast<char>('0' + cnt);
+				cnt = 0;
+			}
+			if (i != 63) res += '/';
+		}
 	}
+	res += ' ';
+	res += _turn;
+	res += ' ';
+	res += _castle_state + ' ' + _en_passant + ' ' + std::to_string(_half_moves) + ' ' + std::to_string(_full_moves);
 	return (res + '\n');
 }
 
-void Chess::setBoard( std::string str )
+void Chess::setBoard( std::string fen )
 {
-	for (int i = 0; i < 64; ++i) {
-		// std::cout << "in set board " << i << ": " << static_cast<int>(str[i] - 32) << std::endl;
-		_board[i] = str[i] - 32;
+	int i = 0, bi = 0;
+	for (; fen[i] != ' '; ++i) {
+		if (isdigit(fen[i])) {
+			for (int j = 0; j < fen[i] - '0'; ++j) {
+				_board[bi++] = PIECES::EMPTY;
+			}
+		} else if (fen[i] != '/') {
+			_board[bi++] = fen[i];
+		}
 	}
+	_turn = fen[i + 1];
+	i += 3;
+	_castle_state = "";
+	for (; fen[i] != ' '; ++i) _castle_state += fen[i];
+	++i;
+	_en_passant = "";
+	for (; fen[i] != ' '; ++i) _en_passant += fen[i];
+	++i;
+	_half_moves = 0;
+	for (; fen[i] != ' '; ++i) _half_moves = _half_moves * 10 + fen[i] - '0';
+	++i;
+	_full_moves = 0;
+	for (; fen[i] != '\n'; ++i) _full_moves = _full_moves * 10 + fen[i] - '0';
 }
 
 void Chess::setCaptures( int index )
@@ -193,12 +286,12 @@ void Chess::setCaptures( int index )
 	_captured.fill(false);
 	if (index < 0 || index >= 64) return ;
 	char piece = _board[index];
-	_turn = (piece & PIECES::WHITE) == PIECES::WHITE;
-	switch (piece & 0x7) {
+	_turn = (isupper(piece)) ? TURN_WHITE : TURN_BLACK;
+	switch (tolower(piece)) {
 		case PIECES::EMPTY:
 			return ;
 		case PIECES::KING:
-			addKingCaptures(index);
+			addKingLegalMoves(index);
 			break ;
 		case PIECES::QUEEN:
 			addQueenCaptures(index);
@@ -213,7 +306,7 @@ void Chess::setCaptures( int index )
 			addKnightCaptures(index);
 			break ;
 		case PIECES::PAWN:
-			addPawnCaptures(index);
+			addPawnLegalMoves(index);
 			break ;
 	}
 }
@@ -248,18 +341,18 @@ void Chess::drawBoard( std::vector<int> &vertices, int except, int startX, int s
 
 	for (int row = 0; row < 8; ++row) {
 		for (int col = 0; col < 8; ++col) {
-			drawSquare(vertices, (row + col) & 0x1, startX + col * square_width, startY + (7 - row) * square_height, square_width, square_height);
+			drawSquare(vertices, !((row + col) & 0x1), startX + col * square_width, startY + row * square_height, square_width, square_height);
 			// std::cout << "row " << row << ", col " << col << ": " << static_cast<int>(_board[(row << 3) + col]) << std::endl;
 			if ((row << 3) + col == except) {
 				continue ; // we skip square at index except
 			}
 			char piece = _board[(row << 3) + col];
 			if (piece != PIECES::EMPTY) {
-				drawSquare(vertices, 1 + (piece & 0x7) + 6 * ((piece & PIECES::WHITE) == PIECES::WHITE), startX + col * square_width, startY + (7 - row) * square_height, square_width, square_height);
+				drawSquare(vertices, texIndex(piece), startX + col * square_width, startY + row * square_height, square_width, square_height);
 			}
 
 			if (_captured[(row << 3) + col]) {
-				drawSquare(vertices, !((row + col) & 0x1), startX + col * square_width + square_width / 4, startY + (7 - row) * square_height + square_height / 4, square_width / 2, square_height / 2);
+				drawSquare(vertices, (row + col) & 0x1, startX + col * square_width + square_width / 4, startY + row * square_height + square_height / 4, square_width / 2, square_height / 2);
 			}
 		}
 	}
@@ -269,7 +362,7 @@ void Chess::drawBoard( std::vector<int> &vertices, int except, int startX, int s
 // return {piece at, index of square} from mouse position on screen
 std::array<int, 2> Chess::getSelectedSquare( double mouseX, double mouseY)
 {
-	int row = (270 - mouseY) / 30;
+	int row = (mouseY - 30) / 30;
 	if (row < 0 || row >= 8) {
 		return {PIECES::EMPTY, -1};
 	}
@@ -282,18 +375,18 @@ std::array<int, 2> Chess::getSelectedSquare( double mouseX, double mouseY)
 
 void Chess::movePiece( int src, int dst )
 {
-	int piece = _board[src];
-	std::cout << ((_turn) ? "whites " : "blacks ") << "move " << PIECES::name[piece & 0x7] << " from " << indexToStr(src) << " to " << indexToStr(dst) << std::endl;
-	if ((piece & PIECES::WHITE) != _turn * PIECES::WHITE) {
+	char piece = _board[src];
+	std::cout << _turn << " move " << piece << " from " << indexToStr(src) << " to " << indexToStr(dst) << std::endl;
+	if ((_turn == TURN_WHITE) ? !isupper(piece) : !islower(piece)) {
 		std::cout << "not your turn to move" << std::endl;
 		return ;
 	}
 	_captured.fill(false);
-	switch (piece & 0x7) {
+	switch (tolower(piece)) {
 		case PIECES::EMPTY:
 			return ;
 		case PIECES::KING:
-			addKingCaptures(src);
+			addKingLegalMoves(src);
 			break ;
 		case PIECES::QUEEN:
 			addQueenCaptures(src);
@@ -308,7 +401,7 @@ void Chess::movePiece( int src, int dst )
 			addKnightCaptures(src);
 			break ;
 		case PIECES::PAWN:
-			addPawnCaptures(src);
+			addPawnLegalMoves(src);
 			break ;
 	}
 
@@ -321,15 +414,62 @@ void Chess::movePiece( int src, int dst )
 		return ;
 	}
 
-	int tmp = _board[dst];
-	_board[dst] = _board[src];
+	char tmp = _board[dst], tmpep = PIECES::EMPTY;
+	_board[dst] = piece;
 	_board[src] = PIECES::EMPTY;
-	if (!legalBoard()) { // if invalid move, restore pos
+	if (tolower(piece) == PIECES::PAWN && ((dst >> 3) == 7 || !(dst >> 3))) { // pawn promotion to a queen
+		_board[dst] = piece - 'P' + 'Q';
+	} else if (tolower(piece) == PIECES::PAWN && tmp == PIECES::EMPTY && (src >> 3) != (dst >> 3)) { // en passant
+		tmpep = _board[dst + ((_turn == TURN_WHITE) ? 8 : -8)];
+		_board[dst + ((_turn == TURN_WHITE) ? 8 : -8)] = PIECES::EMPTY;
+	} else if (tolower(piece) == PIECES::KING && (src - dst == 2 || dst - src == 2)) { // castle
+		_board[dst + ((dst > src) ? -1 : 1)] = piece - 'K' + 'R';
+		_board[dst + ((dst > src) ? 1 : -2)] = PIECES::EMPTY;
+	}
+	if (!legalBoard() && !(tolower(piece) == PIECES::KING && (src - dst == 2 || dst - src == 2))) { // if invalid move, restore pos
 		std::cout << "your king is in check" << std::endl;
-		_board[src] = _board[dst];
+		_board[src] = piece;
 		_board[dst] = tmp;
+		if (tmpep != PIECES::EMPTY) _board[dst + ((_turn == TURN_WHITE) ? 8 : -8)] = tmpep; // restore en passant
+	} else if (tolower(piece) == PIECES::KING && (src - dst == 2 || dst - src == 2)
+			&& (_captured[src] || _captured[dst + ((dst > src) ? -1 : 1)] || _captured[dst])) { // casting would go through a checked square
+		std::cout << "casting would go through a checked square" << std::endl;
+		_board[src] = piece;
+		_board[dst] = tmp;
+		_board[dst + ((dst > src) ? -1 : 1)] = PIECES::EMPTY;
+		_board[dst + ((dst > src) ? 1 : -2)] = piece - 'K' + 'R';
 	} else {
 		std::cout << "legal" << std::endl;
-		_turn = !_turn;
+		_turn = (_turn == TURN_WHITE) ? TURN_BLACK : TURN_WHITE;
+		if (tolower(piece) != PIECES::PAWN && tmp == PIECES::EMPTY) { // incr half moves if not pawn move and not capture (used for 50 moves rule)
+			++_half_moves;
+		} else {
+			_half_moves = 0;
+		}
+		_full_moves += _turn == TURN_WHITE;
+		if (tolower(piece) == PIECES::PAWN && (dst - src == 16 || dst - src == -16)) { // set en passant square for next move
+			_en_passant = indexToStr(dst + ((_turn == TURN_WHITE) ? -8 : 8));
+		} else {
+			_en_passant = "-";
+		}
+		if (tolower(piece) == PIECES::KING) { // rm castle privilieges
+			std::string castle;
+			for (auto c : _castle_state) {
+				if (c == piece || c == piece - 'K' + 'Q');
+				else castle += c;
+			}
+			_castle_state = castle;
+			if (!_castle_state[0]) _castle_state = "-";
+		} else if (tolower(piece) == PIECES::ROOK && (src == 0 || src == 7 || src == 63 || src == 56)) {
+			char rm = piece - 'R' + (!(src & 0x7) ? 'Q' : 'K');
+			std::cout << "rm " << rm << " from castle" << std::endl;
+			std::string castle;
+			for (auto c : _castle_state) {
+				if (c == rm);
+				else castle += c;
+			}
+			_castle_state = castle;
+			if (!_castle_state[0]) _castle_state = "-";
+		}
 	}
 }

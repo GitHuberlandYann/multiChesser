@@ -11,7 +11,7 @@ typedef struct {
 Display::Display( void )
 	: _window(NULL), _winWidth(WIN_WIDTH), _winHeight(WIN_HEIGHT),
 		_texture(NULL), _client(NULL), _state(STATE::MENU), _mouse_pressed(false),
-		_selected_piece({PIECES::EMPTY, -1}), _ip("localhost")
+		_selected_piece({'0', -1}), _ip("localhost")
 {
 	_chess = new Chess();
 }
@@ -234,18 +234,18 @@ void Display::load_texture( void )
 	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGBA8, 300, 300, 14);
 	loadSubTextureArray(0, "Resources/back_black.png");
 	loadSubTextureArray(1, "Resources/back_white.png");
-	loadSubTextureArray(2, "Resources/bk.png");
-	loadSubTextureArray(3, "Resources/bq.png");
-	loadSubTextureArray(4, "Resources/br.png");
-	loadSubTextureArray(5, "Resources/bb.png");
-	loadSubTextureArray(6, "Resources/bn.png");
-	loadSubTextureArray(7, "Resources/bp.png");
-	loadSubTextureArray(8, "Resources/wk.png");
-	loadSubTextureArray(9, "Resources/wq.png");
-	loadSubTextureArray(10, "Resources/wr.png");
-	loadSubTextureArray(11, "Resources/wb.png");
-	loadSubTextureArray(12, "Resources/wn.png");
-	loadSubTextureArray(13, "Resources/wp.png");
+	loadSubTextureArray(2, "Resources/wk.png");
+	loadSubTextureArray(3, "Resources/wq.png");
+	loadSubTextureArray(4, "Resources/wr.png");
+	loadSubTextureArray(5, "Resources/wb.png");
+	loadSubTextureArray(6, "Resources/wn.png");
+	loadSubTextureArray(7, "Resources/wp.png");
+	loadSubTextureArray(8, "Resources/bk.png");
+	loadSubTextureArray(9, "Resources/bq.png");
+	loadSubTextureArray(10, "Resources/br.png");
+	loadSubTextureArray(11, "Resources/bb.png");
+	loadSubTextureArray(12, "Resources/bn.png");
+	loadSubTextureArray(13, "Resources/bp.png");
 	glUniform1i(glGetUniformLocation(_shaderProgram, "pieces"), 0);
 	check_glstate("texture_2D_array done", true);
 }
@@ -260,9 +260,9 @@ void Display::handleInputs( void )
 		std::cout << "piece " << _selected_piece[0] << " at " << _selected_piece[1] << std::endl;
 	} else if (glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
 		_mouse_pressed = false;
-		if (_selected_piece[0] != PIECES::EMPTY) {
+		if (_selected_piece[0] != '0') {
 			_client->setMsg(_selected_piece[1], _chess->getSelectedSquare(mouseX, mouseY)[1]);
-			_selected_piece = {PIECES::EMPTY, -1};
+			_selected_piece = {'0', -1};
 		}
 	}
 
@@ -276,10 +276,10 @@ void Display::draw_rectangles( void )
 	if (true) {
 		std::vector<int> vertices;
 		_chess->drawBoard(vertices, _selected_piece[1], 30, 30, 240, 240);
-		if (_selected_piece[0] != PIECES::EMPTY) {
+		if (_selected_piece[0] != '0') {
 			double mouseX, mouseY;
 			glfwGetCursorPos(_window, &mouseX, &mouseY);
-			_chess->drawSquare(vertices, 1 + (_selected_piece[0] & 0x7) + 6 * ((_selected_piece[0] & PIECES::WHITE) == PIECES::WHITE), mouseX - 15, mouseY - 15, 30, 30);
+			_chess->drawSquare(vertices, _chess->texIndex(_selected_piece[0]), mouseX - 15, mouseY - 15, 30, 30);
 		}
 		glUseProgram(_shaderProgram);
 		glBindVertexArray(_vao);
@@ -358,7 +358,10 @@ void Display::start( void )
 
 void Display::parseServerInput( std::string str )
 {
-	// std::cout << "parse input" << std::endl;
+	std::cout << "parse input: " << str << std::flush;
+	// if (!str.compare(0, 5, "pgn: ")) {
+	// 	_chess->setPGN(str);
+	// } else {
 	_chess->setBoard(str);
 	_chess->setCaptures(-1);
 }

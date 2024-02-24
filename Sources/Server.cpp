@@ -142,5 +142,5 @@ void Server::handleMessages( void )
 		return ;
 	}
 
-	broadcast(0, _chess->getBoard(), &wfds);
+	broadcast(0, _chess->getFEN(), &wfds);
 }

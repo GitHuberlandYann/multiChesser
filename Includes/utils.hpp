@@ -5,7 +5,7 @@
 # define WIN_HEIGHT 300
 # define RECT_SIZE 25
 
-# define PORT 8080
+# define PORT 31415
 
 # include <iostream>
 # include <string>
