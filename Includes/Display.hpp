@@ -32,7 +32,7 @@ class Display
 		GLuint *_texture;
 		Client *_client;
 		Chess *_chess;
-		int _state;
+		int _state, _port;
 		bool _mouse_pressed;
 		std::array<int, 2> _selected_piece; // {piece::value, starting_square}
 		std::string _ip;
@@ -55,7 +55,9 @@ class Display
 		~Display( void );
 
 		void setIP( std::string ip );
+		void setPort( int port );
 		void start( void );
+
 		void parseServerInput( std::string str );
 };
 

@@ -4,7 +4,7 @@
 #include <sys/socket.h> // listen, accept, send, recv
 #include <unistd.h> // close
 
-Server::Server( void ) : _chess(new Chess())
+Server::Server( void ) : _port(PORT), _chess(new Chess())
 {
 	std::cout << "Server started, waiting for connections..." << std::endl;
 	_socket_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -42,15 +42,35 @@ void Server::broadcast( int fd, std::string msg, fd_set *wfds )
 	// std::cout << "Boadcasted " << msg << std::flush;
 }
 
-// ************************************************************************** //
-//                                Public                                      //
-// ************************************************************************** //
+void Server::parseClientInput( std::string str )
+{
+	// if (!str.compare(0, 8, "button: ")) {
+	// 	broadcast(str.substr(8));
+	// } else {
+	int index = 0, x = 0, y = 0;
+	bool xSign = false, ySign = false;
+	if (str[index] == '-') {
+		xSign = true;
+		++index;
+	}
+	for (; isdigit(str[index]); ++index) x = x * 10 + str[index] - '0';
+	++index;
+	if (str[index] == '-') {
+		ySign = true;
+		++index;
+	}
+	for (; isdigit(str[index]); ++index) y = y * 10 + str[index] - '0';
+	int src = (xSign) ? -x : x;
+	int dst = (ySign) ? -y : y;
+	// std::cout << "move piece " << src << ", " << dst << std::endl;
+	_chess->movePiece(src, dst);
+}
 
 void Server::bindSocket( void )
 {
 	struct sockaddr_in addr;
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(PORT);
+	addr.sin_port = htons(_port);
 	// addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK); // localhost only
 	addr.sin_addr.s_addr = htonl(INADDR_ANY);
 	std::cout << "serv addr " << inet_ntoa(addr.sin_addr) << " port " << ntohs(addr.sin_port) << std::endl;
@@ -116,23 +136,7 @@ void Server::handleMessages( void )
 			if (buff[j] == '\n') {
 				// std::cout << "received from client " << c.str << std::flush;
 				modif = true;
-				int index = 0, x = 0, y = 0;
-				bool xSign = false, ySign = false;
-				if (c.str[index] == '-') {
-					xSign = true;
-					++index;
-				}
-				for (; isdigit(c.str[index]); ++index) x = x * 10 + c.str[index] - '0';
-				++index;
-				if (c.str[index] == '-') {
-					ySign = true;
-					++index;
-				}
-				for (; isdigit(c.str[index]); ++index) y = y * 10 + c.str[index] - '0';
-				int src = (xSign) ? -x : x;
-				int dst = (ySign) ? -y : y;
-				// std::cout << "move piece " << src << ", " << dst << std::endl;
-				_chess->movePiece(src, dst);
+				parseClientInput(c.str);
 				c.str = "";
 			}
 		}
@@ -143,4 +147,22 @@ void Server::handleMessages( void )
 	}
 
 	broadcast(0, _chess->getFEN(), &wfds);
+}
+
+// ************************************************************************** //
+//                                Public                                      //
+// ************************************************************************** //
+
+void Server::setPort( int port )
+{
+	_port = port;
+}
+
+void Server::start( void )
+{
+	bindSocket();
+	listenToClients();
+	while (true) {
+		handleMessages();
+	}
 }

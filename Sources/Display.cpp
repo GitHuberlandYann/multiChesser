@@ -10,7 +10,7 @@ typedef struct {
 
 Display::Display( void )
 	: _window(NULL), _winWidth(WIN_WIDTH), _winHeight(WIN_HEIGHT),
-		_texture(NULL), _client(NULL), _state(STATE::MENU), _mouse_pressed(false),
+		_texture(NULL), _client(NULL), _state(STATE::MENU), _port(PORT), _mouse_pressed(false),
 		_selected_piece({'0', -1}), _ip("localhost")
 {
 	_chess = new Chess();
@@ -257,12 +257,12 @@ void Display::handleInputs( void )
 	if (!_mouse_pressed && glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
 		_mouse_pressed = true;
 		_selected_piece = _chess->getSelectedSquare(mouseX, mouseY);
-		std::cout << "piece " << _selected_piece[0] << " at " << _selected_piece[1] << std::endl;
+		// std::cout << "piece " << _selected_piece[0] << " at " << _selected_piece[1] << std::endl;
 	} else if (glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
 		_mouse_pressed = false;
-		if (_selected_piece[0] != '0') {
+		if (_selected_piece[0] != PIECES::EMPTY) {
 			_client->setMsg(_selected_piece[1], _chess->getSelectedSquare(mouseX, mouseY)[1]);
-			_selected_piece = {'0', -1};
+			_selected_piece = {PIECES::EMPTY, -1};
 		}
 	}
 
@@ -273,10 +273,10 @@ void Display::handleInputs( void )
 
 void Display::draw_rectangles( void )
 {
-	if (true) {
+	if (_client) {
 		std::vector<int> vertices;
 		_chess->drawBoard(vertices, _selected_piece[1], 30, 30, 240, 240);
-		if (_selected_piece[0] != '0') {
+		if (_selected_piece[0] != PIECES::EMPTY) {
 			double mouseX, mouseY;
 			glfwGetCursorPos(_window, &mouseX, &mouseY);
 			_chess->drawSquare(vertices, _chess->texIndex(_selected_piece[0]), mouseX - 15, mouseY - 15, 30, 30);
@@ -315,7 +315,7 @@ void Display::main_loop( void )
 				if (glfwGetKey(_window, GLFW_KEY_SPACE) == GLFW_PRESS) {
 					_client = new Client();
 					_client->setDisplay(this);
-					_client->connectSocket(_ip);
+					_client->connectSocket(_ip, _port);
 					// std::cout << "debug after connect" << std::endl;
 					_state = STATE::GAME;
 				}
@@ -345,6 +345,11 @@ void Display::main_loop( void )
 void Display::setIP( std::string ip )
 {
 	_ip = ip;
+}
+
+void Display::setPort( int port )
+{
+	_port = port;
 }
 
 void Display::start( void )

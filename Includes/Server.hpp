@@ -15,21 +15,25 @@ typedef struct s_client {
 class Server
 {
 	private:
-		int _socket_fd;
+		int _socket_fd, _port;
 		fd_set _fds;
 		std::array<t_client, FD_SETSIZE> _clients;
 		Chess *_chess;
 
 		t_client create_client( void );
 		void broadcast( int fd, std::string msg, fd_set *wfds );
+		void parseClientInput( std::string str );
+
+		void bindSocket( void );
+		void listenToClients( void );
+		void handleMessages( void );
 
 	public:
 		Server( void );
 		~Server( void );
 
-		void bindSocket( void );
-		void listenToClients( void );
-		void handleMessages( void );
+		void setPort( int port );
+		void start( void );
 };
 
 #endif

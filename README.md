@@ -26,9 +26,9 @@ make setup will install the needed [static libraries.](#libraries)
 
 make will create the needed executables - server and client.
 
-The program ./server needs to be launched once, it will bind itself to the port 8080 and wait for connections.
+The program ./server needs to be launched once, it will bind itself to the port 31415 and wait for connections.  If you want to use another port, launch it as ./server port.
 
-The program ./client can be launched several times from different terminals, once you press space, they will connect to the server and the game begins.
+The program ./client can be launched several times from different terminals, once you press space, they will connect to the server and the game begins.  If you launch it from another computer on the same local network, use ./client ip port.
 
 ## Libraries
 * [GLFW](https://github.com/glfw/glfw.git) is an Open Source, multi-platform library for OpenGL, OpenGL ES and Vulkan application development. It provides a simple, platform-independent API for creating windows, contexts and surfaces, reading input, handling events, etc.

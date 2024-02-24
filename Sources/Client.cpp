@@ -35,7 +35,7 @@ void Client::setDisplay( Display *display )
 	_display = display;
 }
 
-void Client::connectSocket( std::string ip )
+void Client::connectSocket( std::string ip, int port )
 {
 	struct hostent *server = gethostbyname(ip.c_str());
 	if (!server) {
@@ -44,7 +44,7 @@ void Client::connectSocket( std::string ip )
 
     struct sockaddr_in addr;
 	addr.sin_family = AF_INET;
-	addr.sin_port = htons(PORT);
+	addr.sin_port = htons(port);
 	bcopy((char *)server->h_addr, (char *)&addr.sin_addr.s_addr, server->h_length);
 	std::cout << "serv addr " << inet_ntoa(addr.sin_addr) << " port " << ntohs(addr.sin_port) << std::endl;
 
