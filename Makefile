@@ -4,10 +4,10 @@ OBJS_DIR		= Objs
 SRCS_DIR		= Sources
 
 FILES_SERVER	= main_server Chess Server utils
-FILES_CLIENT	= main_client Chess Display Client utils
+FILES_CLIENT	= main_client callbacks Chess Display Client utils
 
-SRCS			= $(addprefix $(SRCS_DIR)/, $(addsuffix .cpp, $(FILES_SERVER)))
-OBJS 			= $(addprefix $(OBJS_DIR)/, $(addsuffix .o, $(FILES_SERVER)))
+SER_SRCS			= $(addprefix $(SRCS_DIR)/, $(addsuffix .cpp, $(FILES_SERVER)))
+SER_OBJS 			= $(addprefix $(OBJS_DIR)/, $(addsuffix .o, $(FILES_SERVER)))
 CLI_SRCS		= $(addprefix $(SRCS_DIR)/, $(addsuffix .cpp, $(FILES_CLIENT)))
 CLI_OBJS 		= $(addprefix $(OBJS_DIR)/, $(addsuffix .o, $(FILES_CLIENT)))
 
@@ -29,7 +29,7 @@ endif
 
 # # ===---===---===---===---===---===---===---===---===---===---===---===---
 
-all: $(OBJS_DIR) $(SER_NAME) $(CLI_OBJS_DIR) $(CLI_NAME)
+all: $(OBJS_DIR) $(SER_NAME) $(CLI_NAME)
 
 $(OBJS_DIR):
 	@mkdir -p $(OBJS_DIR)
@@ -44,8 +44,8 @@ cleanLibs:
 	cd Libs/glew-2.2.0 && make clean
 	cd Libs/glfw && make clean
 
-$(SER_NAME): $(OBJS)
-	$(CC) $(CPPFLAGS) $(SAN) $(INCLUDES) $(OBJS) -o $(SER_NAME)
+$(SER_NAME): $(SER_OBJS)
+	$(CC) $(CPPFLAGS) $(SAN) $(INCLUDES) $(SER_OBJS) -o $(SER_NAME)
 
 $(CLI_NAME): $(CLI_OBJS)
 	$(CC) $(CPPFLAGS) $(SAN) $(INCLUDES) $(CLI_OBJS) -o $(CLI_NAME) $(LDFLAGS)
@@ -54,7 +54,7 @@ $(OBJS_DIR)/%.o: $(SRCS_DIR)/%.cpp
 	$(CC) $(CPPFLAGS) $(SAN) $(INCLUDES) -c $< -o $@
 
 clean:
-	rm -rf $(OBJS_DIR) $(CLI_OBJS_DIR)
+	rm -rf $(OBJS_DIR)
 
 fclean: clean
 	rm -f $(SER_NAME) $(CLI_NAME)

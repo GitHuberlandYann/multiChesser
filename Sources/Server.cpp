@@ -107,6 +107,8 @@ void Server::handleMessages( void )
 
 		modif = true;
 		std::cout << "server: client " << std::to_string(_clients[cfd].id) << ": got connection from " << inet_ntoa(addr.sin_addr) << " port " << ntohs(addr.sin_port) << std::endl;
+		std::string msg = _chess->getFEN();
+		send(cfd, &msg[0], msg.size(), 0);
 		return ;
 	}
 

@@ -1,5 +1,6 @@
 #include "Display.hpp"
 #include "utils.hpp"
+#include "callbacks.hpp"
 
 #include "SOIL/SOIL.h"
 typedef struct {
@@ -135,6 +136,7 @@ void Display::setup_window( void )
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
 	glfwWindowHint(GLFW_RESIZABLE, GL_TRUE);
+	// glfwWindowHint(GLFW_TRANSPARENT_FRAMEBUFFER, GL_TRUE);
 	// glfwWindowHint(GLFW_CENTER_CURSOR, GL_TRUE);
 
 	std::cout << "win size is set to " << _winWidth << ", " << _winHeight << std::endl;
@@ -177,9 +179,8 @@ void Display::create_shaders( void )
 void Display::setup_communication_shaders( void )
 {
 	_uniWidth = glGetUniformLocation(_shaderProgram, "win_width");
-	glUniform1i(_uniWidth, _winWidth);
 	_uniHeight = glGetUniformLocation(_shaderProgram, "win_height");
-	glUniform1i(_uniHeight, _winHeight);
+	setWindowSize(_winWidth, _winHeight);
 
 	check_glstate("\nCommunication with shader program successfully established", true);
 
@@ -256,18 +257,20 @@ void Display::handleInputs( void )
 	glfwGetCursorPos(_window, &mouseX, &mouseY);
 	if (!_mouse_pressed && glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
 		_mouse_pressed = true;
-		_selected_piece = _chess->getSelectedSquare(mouseX, mouseY);
+		_selected_piece = _chess->getSelectedSquare(mouseX, mouseY, _squareSize);
 		// std::cout << "piece " << _selected_piece[0] << " at " << _selected_piece[1] << std::endl;
 	} else if (glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
 		_mouse_pressed = false;
 		if (_selected_piece[0] != PIECES::EMPTY) {
-			_client->setMsg(_selected_piece[1], _chess->getSelectedSquare(mouseX, mouseY)[1]);
+			int dst = _chess->getSelectedSquare(mouseX, mouseY, _squareSize)[1];
+			_chess->forceMovePiece(_selected_piece[1], dst);
+			_client->setMsg(_selected_piece[1], dst);
 			_selected_piece = {PIECES::EMPTY, -1};
 		}
 	}
 
 	if (glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
-		_chess->setCaptures(_chess->getSelectedSquare(mouseX, mouseY)[1]);
+		_chess->setCaptures(_chess->getSelectedSquare(mouseX, mouseY, _squareSize)[1]);
 	}
 }
 
@@ -275,11 +278,11 @@ void Display::draw_rectangles( void )
 {
 	if (_client) {
 		std::vector<int> vertices;
-		_chess->drawBoard(vertices, _selected_piece[1], 30, 30, 240, 240);
+		_chess->drawBoard(vertices, _selected_piece[1], _squareSize);
 		if (_selected_piece[0] != PIECES::EMPTY) {
 			double mouseX, mouseY;
 			glfwGetCursorPos(_window, &mouseX, &mouseY);
-			_chess->drawSquare(vertices, _chess->texIndex(_selected_piece[0]), mouseX - 15, mouseY - 15, 30, 30);
+			_chess->drawSquare(vertices, _chess->texIndex(_selected_piece[0]), mouseX - (_squareSize >> 1), mouseY - (_squareSize >> 1), _squareSize);
 		}
 		glUseProgram(_shaderProgram);
 		glBindVertexArray(_vao);
@@ -300,8 +303,12 @@ void Display::draw_rectangles( void )
 
 void Display::main_loop( void )
 {
+	glEnable(GL_BLEND);
+	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glfwSwapInterval(1);
 	glClearColor(0, 0, 0, 1.0f);
+	set_window_size_callback(this);
+	glfwSetWindowSizeCallback(_window, window_size_callback);
 
 	check_glstate("setup done, entering main loop\n", true);
 
@@ -350,6 +357,16 @@ void Display::setIP( std::string ip )
 void Display::setPort( int port )
 {
 	_port = port;
+}
+
+void Display::setWindowSize( int width, int height )
+{
+	_winWidth = width;
+	glUniform1i(_uniWidth, width);
+	_winHeight = height;
+	glUniform1i(_uniHeight, height);
+	_squareSize = (width / GOLDEN_RATIO < height) ? width / GOLDEN_RATIO : height;
+	_squareSize /= 10;
 }
 
 void Display::start( void )

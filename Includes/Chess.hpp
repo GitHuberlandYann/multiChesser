@@ -62,9 +62,10 @@ class Chess
 		std::string getFEN( void );
 		void setBoard( std::string fen );
 		void setCaptures( int index );
-		void drawSquare( std::vector<int> &vertices, int type, int startX, int startY, int width, int height);
-		void drawBoard( std::vector<int> &vertices, int except, int startX, int startY, int width, int height );
-		std::array<int, 2> getSelectedSquare( double mouseX, double mouseY);
+		void drawSquare( std::vector<int> &vertices, int type, int startX, int startY, int square_size );
+		void drawBoard( std::vector<int> &vertices, int except, int square_size );
+		std::array<int, 2> getSelectedSquare( double mouseX, double mouseY, int square_size );
+		void forceMovePiece( int src, int dst );
 		void movePiece( int src, int dst );
 };
 

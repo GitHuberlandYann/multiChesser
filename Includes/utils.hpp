@@ -1,10 +1,6 @@
 #ifndef UTILS_HPP
 # define UTILS_HPP
 
-# define WIN_WIDTH 300
-# define WIN_HEIGHT 300
-# define RECT_SIZE 25
-
 # define PORT 31415
 
 # include <iostream>

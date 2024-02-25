@@ -311,48 +311,47 @@ void Chess::setCaptures( int index )
 	}
 }
 
-void Chess::drawSquare( std::vector<int> &vertices, int type, int startX, int startY, int width, int height)
+void Chess::drawSquare( std::vector<int> &vertices, int type, int startX, int startY, int square_size )
 {
 	// std::cout << "square with layer " << type << std::endl;
 	vertices.push_back(0 + (0 << 1) + (type << 2));
 	vertices.push_back(startX);
 	vertices.push_back(startY);
 	vertices.push_back(1 + (0 << 1) + (type << 2));
-	vertices.push_back(startX + width);
+	vertices.push_back(startX + square_size);
 	vertices.push_back(startY);
 	vertices.push_back(0 + (1 << 1) + (type << 2));
 	vertices.push_back(startX);
-	vertices.push_back(startY + height);
+	vertices.push_back(startY + square_size);
 
 	vertices.push_back(1 + (0 << 1) + (type << 2));
-	vertices.push_back(startX + width);
+	vertices.push_back(startX + square_size);
 	vertices.push_back(startY);
 	vertices.push_back(1 + (1 << 1) + (type << 2));
-	vertices.push_back(startX + width);
-	vertices.push_back(startY + height);
+	vertices.push_back(startX + square_size);
+	vertices.push_back(startY + square_size);
 	vertices.push_back(0 + (1 << 1) + (type << 2));
 	vertices.push_back(startX);
-	vertices.push_back(startY + height);
+	vertices.push_back(startY + square_size);
 }
 
-void Chess::drawBoard( std::vector<int> &vertices, int except, int startX, int startY, int width, int height )
+void Chess::drawBoard( std::vector<int> &vertices, int except, int square_size )
 {
-	int square_width = width >> 3, square_height = height >> 3;
-
+	// std::cout << "drawing board at origin " << startX << ", " << startY << " - size is " << width << ", " << height << std::endl;
 	for (int row = 0; row < 8; ++row) {
 		for (int col = 0; col < 8; ++col) {
-			drawSquare(vertices, !((row + col) & 0x1), startX + col * square_width, startY + row * square_height, square_width, square_height);
+			drawSquare(vertices, !((row + col) & 0x1), square_size + col * square_size, square_size + row * square_size, square_size);
 			// std::cout << "row " << row << ", col " << col << ": " << static_cast<int>(_board[(row << 3) + col]) << std::endl;
 			if ((row << 3) + col == except) {
 				continue ; // we skip square at index except
 			}
 			char piece = _board[(row << 3) + col];
 			if (piece != PIECES::EMPTY) {
-				drawSquare(vertices, texIndex(piece), startX + col * square_width, startY + row * square_height, square_width, square_height);
+				drawSquare(vertices, texIndex(piece), square_size + col * square_size, square_size + row * square_size, square_size);
 			}
 
 			if (_captured[(row << 3) + col]) {
-				drawSquare(vertices, (row + col) & 0x1, startX + col * square_width + square_width / 4, startY + row * square_height + square_height / 4, square_width / 2, square_height / 2);
+				drawSquare(vertices, (row + col) & 0x1, square_size + col * square_size + (square_size >> 2), square_size + row * square_size + (square_size >> 2), (square_size >> 1));
 			}
 		}
 	}
@@ -360,17 +359,25 @@ void Chess::drawBoard( std::vector<int> &vertices, int except, int startX, int s
 }
 
 // return {piece at, index of square} from mouse position on screen
-std::array<int, 2> Chess::getSelectedSquare( double mouseX, double mouseY)
+std::array<int, 2> Chess::getSelectedSquare( double mouseX, double mouseY, int square_size )
 {
-	int row = (mouseY - 30) / 30;
+	int row = (mouseY - square_size) / square_size;
 	if (row < 0 || row >= 8) {
 		return {PIECES::EMPTY, -1};
 	}
-	int col = (mouseX - 30) / 30;
+	int col = (mouseX - square_size) / square_size;
 	if (col < 0 || col >= 8) {
 		return {PIECES::EMPTY, -1};
 	}
 	return {_board[(row << 3) + col], (row << 3) + col};
+}
+
+// only used for visual purposes
+// move piece to square untill server processes move
+void Chess::forceMovePiece( int src, int dst )
+{
+	_board[dst] = _board[src];
+	_board[src] = PIECES::EMPTY;
 }
 
 void Chess::movePiece( int src, int dst )
