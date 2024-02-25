@@ -39,7 +39,7 @@ class Chess
 		int _half_moves, _full_moves;
 		std::array<bool, 64> _captured;
 		std::vector<std::array<char, 64>> _history;
-		char _turn;
+		char _turn, _color;
 
 		bool addCapture( int row, int col, bool empty_allowed = true, bool capture_allowed = true );
 		void addKingCaptures( int index );
@@ -51,6 +51,7 @@ class Chess
 		void addPawnCaptures( int index );
 		void addPawnLegalMoves( int index );
 		bool legalBoard( void );
+		void movePiece( int src, int dst, char src_piece, char dst_piece );
 
 		std::string indexToStr( int index );
 
@@ -60,13 +61,15 @@ class Chess
 
 		int texIndex( char piece );
 		std::string getFEN( void );
+		void setColor( char color );
 		void setBoard( std::string fen );
 		void setCaptures( int index );
 		void drawSquare( std::vector<int> &vertices, int type, int startX, int startY, int square_size );
+		void drawWaitingRoom( std::vector<int> &vertices, int mouseX, int mouseY, int square_size );
 		void drawBoard( std::vector<int> &vertices, int except, int square_size );
-		std::array<int, 2> getSelectedSquare( double mouseX, double mouseY, int square_size );
-		void forceMovePiece( int src, int dst );
-		void movePiece( int src, int dst );
+		std::array<int, 3> getSelectedSquare( double mouseX, double mouseY, int square_size );
+		bool forceMovePiece( int src, int dst );
+		void tryMovePiece( int src, int dst );
 };
 
 #endif

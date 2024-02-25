@@ -12,7 +12,7 @@ typedef struct {
 Display::Display( void )
 	: _window(NULL), _winWidth(WIN_WIDTH), _winHeight(WIN_HEIGHT),
 		_texture(NULL), _client(NULL), _state(STATE::MENU), _port(PORT), _mouse_pressed(false),
-		_selected_piece({'0', -1}), _ip("localhost")
+		_selected_piece({PIECES::EMPTY, -1, -1}), _ip("localhost")
 {
 	_chess = new Chess();
 }
@@ -257,20 +257,45 @@ void Display::handleInputs( void )
 	glfwGetCursorPos(_window, &mouseX, &mouseY);
 	if (!_mouse_pressed && glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
 		_mouse_pressed = true;
-		_selected_piece = _chess->getSelectedSquare(mouseX, mouseY, _squareSize);
+		_chess->setCaptures(-1);
+		if (_selected_piece[0] == PIECES::EMPTY) {
+			_selected_piece = _chess->getSelectedSquare(mouseX, mouseY, _squareSize);
+			if (_selected_piece[0] == PIECES::EMPTY) {
+				_selected_piece[2] = -1;
+			}
+		} else {
+			std::array<int, 3> dst = _chess->getSelectedSquare(mouseX, mouseY, _squareSize);
+			if (dst[1] == _selected_piece[1]) {
+			} else if (_chess->forceMovePiece(_selected_piece[1], dst[1])) {
+				_client->setMsg(_selected_piece[1], dst[1]);
+			} else {
+				_selected_piece = dst;
+				_chess->setCaptures(-1);
+				return ;
+			}
+			_chess->setCaptures(-1);
+			_selected_piece = {PIECES::EMPTY, -1, -1};
+		}
 		// std::cout << "piece " << _selected_piece[0] << " at " << _selected_piece[1] << std::endl;
-	} else if (glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
+	} else if (_mouse_pressed && glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
 		_mouse_pressed = false;
 		if (_selected_piece[0] != PIECES::EMPTY) {
 			int dst = _chess->getSelectedSquare(mouseX, mouseY, _squareSize)[1];
-			_chess->forceMovePiece(_selected_piece[1], dst);
-			_client->setMsg(_selected_piece[1], dst);
-			_selected_piece = {PIECES::EMPTY, -1};
+			if (dst == _selected_piece[1]) {
+				_selected_piece[2] = -1;
+				_chess->setCaptures(_selected_piece[1]);
+				return ;
+			}
+			if (_chess->forceMovePiece(_selected_piece[1], dst)) {
+				_client->setMsg(_selected_piece[1], dst);
+			}
+			_selected_piece = {PIECES::EMPTY, -1, -1};
 		}
 	}
 
 	if (glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
-		_chess->setCaptures(_chess->getSelectedSquare(mouseX, mouseY, _squareSize)[1]);
+		_selected_piece = {PIECES::EMPTY, -1, -1};
+		_chess->setCaptures(-1);
 	}
 }
 
@@ -278,11 +303,20 @@ void Display::draw_rectangles( void )
 {
 	if (_client) {
 		std::vector<int> vertices;
-		_chess->drawBoard(vertices, _selected_piece[1], _squareSize);
-		if (_selected_piece[0] != PIECES::EMPTY) {
-			double mouseX, mouseY;
-			glfwGetCursorPos(_window, &mouseX, &mouseY);
-			_chess->drawSquare(vertices, _chess->texIndex(_selected_piece[0]), mouseX - (_squareSize >> 1), mouseY - (_squareSize >> 1), _squareSize);
+		switch (_state) {
+			case STATE::WAITING_ROOM:
+				double mouseX, mouseY;
+				glfwGetCursorPos(_window, &mouseX, &mouseY);
+				_chess->drawWaitingRoom(vertices, mouseX, mouseY, _squareSize);
+				break ;
+			case STATE::INGAME:
+				_chess->drawBoard(vertices, _selected_piece[2], _squareSize);
+				if (_selected_piece[2] != -1) {
+					double mouseX, mouseY;
+					glfwGetCursorPos(_window, &mouseX, &mouseY);
+					_chess->drawSquare(vertices, _chess->texIndex(_selected_piece[0]), mouseX - (_squareSize >> 1), mouseY - (_squareSize >> 1), _squareSize);
+				}
+				break ;
 		}
 		glUseProgram(_shaderProgram);
 		glBindVertexArray(_vao);
@@ -324,17 +358,16 @@ void Display::main_loop( void )
 					_client->setDisplay(this);
 					_client->connectSocket(_ip, _port);
 					// std::cout << "debug after connect" << std::endl;
-					_state = STATE::GAME;
+					_state = STATE::WAITING_ROOM;
 				}
 				break ;
-			case STATE::GAME:
+			case STATE::WAITING_ROOM:
+				_client->handleMessages();
+				break ;
+			case STATE::INGAME:
 				// std::cout << "debug time" << std::endl;
 				handleInputs();
-				if (!_client->handleMessages()) {
-					delete _client;
-					_client = NULL;
-					_state = STATE::GAME;
-				}
+				_client->handleMessages();
 				// std::cout << "over" << std::endl;
 				break ;
 		}
@@ -380,10 +413,19 @@ void Display::start( void )
 
 void Display::parseServerInput( std::string str )
 {
-	std::cout << "parse input: " << str << std::flush;
-	// if (!str.compare(0, 5, "pgn: ")) {
+	std::cout << str << std::flush;
+	if (!str.compare(0, 5, "FEN: ")) {
+		if (_state == STATE::WAITING_ROOM) {
+			_state = STATE::INGAME;
+		}
+		_chess->setBoard(str.substr(5));
+		_chess->setCaptures(-1);
+	} else if (!str.compare(0, 5, "col: ")) {
+		_chess->setColor(str[5]);
+	}
+	// else if (!str.compare(0, 5, "PGN: ")) {
 	// 	_chess->setPGN(str);
-	// } else {
-	_chess->setBoard(str);
-	_chess->setCaptures(-1);
+	// } else if (!str.compare(0, 5, "MSG: ")) { // msg from opponent
+	// } else if  (!str.compare(0, 5, "END: ")) { // game ended (checkmate / draw / pat / repetition / resign / deconnection)
+	// }
 }

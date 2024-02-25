@@ -64,7 +64,7 @@ void Client::setMsg( int src, int dst )
 	_msg = std::to_string(src) + " " + std::to_string(dst) + " \n";
 }
 
-bool Client::handleMessages( void )
+void Client::handleMessages( void )
 {
 	fd_set rfds = _fds, wfds = _fds;
 
@@ -98,6 +98,4 @@ bool Client::handleMessages( void )
 			}
 		}
 	}
-
-	return (true);
 }

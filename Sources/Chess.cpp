@@ -2,7 +2,8 @@
 #include <iostream>
 
 Chess::Chess( void )
-	: _board(PIECES::board_init), _castle_state("KQkq"), _en_passant("-"), _half_moves(0), _full_moves(1), _turn(TURN_WHITE)
+	: _board(PIECES::board_init), _castle_state("KQkq"), _en_passant("-"),
+	_half_moves(0), _full_moves(1), _turn(TURN_WHITE), _color(TURN_WHITE)
 {
 	_captured.fill(false);
 }
@@ -187,6 +188,41 @@ bool Chess::legalBoard( void )
 	return (!_captured[king_pos]);
 }
 
+void Chess::movePiece( int src, int dst, char src_piece, char dst_piece)
+{
+	_turn = (_turn == TURN_WHITE) ? TURN_BLACK : TURN_WHITE;
+	if (tolower(src_piece) != PIECES::PAWN && dst_piece == PIECES::EMPTY) { // incr half moves if not pawn move and not capture (used for 50 moves rule)
+		++_half_moves;
+	} else {
+		_half_moves = 0;
+	}
+	_full_moves += _turn == TURN_WHITE;
+	if (tolower(src_piece) == PIECES::PAWN && (dst - src == 16 || dst - src == -16)) { // set en passant square for next move
+		_en_passant = indexToStr(dst + ((_turn == TURN_WHITE) ? -8 : 8));
+	} else {
+		_en_passant = "-";
+	}
+	if (tolower(src_piece) == PIECES::KING) { // rm castle privilieges
+		std::string castle;
+		for (auto c : _castle_state) {
+			if (c == src_piece || c == src_piece - 'K' + 'Q');
+			else castle += c;
+		}
+		_castle_state = castle;
+		if (!_castle_state[0]) _castle_state = "-";
+	} else if (tolower(src_piece) == PIECES::ROOK && (src == 0 || src == 7 || src == 63 || src == 56)) {
+		char rm = src_piece - 'R' + (!(src & 0x7) ? 'Q' : 'K');
+		std::cout << "rm " << rm << " from castle" << std::endl;
+		std::string castle;
+		for (auto c : _castle_state) {
+			if (c == rm);
+			else castle += c;
+		}
+		_castle_state = castle;
+		if (!_castle_state[0]) _castle_state = "-";
+	}
+}
+
 std::string Chess::indexToStr( int index )
 {
 	if (index < 0 || index >= 64) {
@@ -225,7 +261,7 @@ int Chess::texIndex( char piece )
 // Forsyth-Edwards Notation rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
 std::string Chess::getFEN( void )
 {
-	std::string res;
+	std::string res = "FEN: ";
 	int cnt = 0;
 
 	for (int i = 0; i < 64; ++i) {
@@ -252,6 +288,11 @@ std::string Chess::getFEN( void )
 	res += ' ';
 	res += _castle_state + ' ' + _en_passant + ' ' + std::to_string(_half_moves) + ' ' + std::to_string(_full_moves);
 	return (res + '\n');
+}
+
+void Chess::setColor( char color )
+{
+	_color = color;
 }
 
 void Chess::setBoard( std::string fen )
@@ -285,8 +326,11 @@ void Chess::setCaptures( int index )
 {
 	_captured.fill(false);
 	if (index < 0 || index >= 64) return ;
+	if (_color != _turn) return ;
 	char piece = _board[index];
-	_turn = (isupper(piece)) ? TURN_WHITE : TURN_BLACK;
+	if ((_color == TURN_WHITE) ? !isupper(piece) : !islower(piece)) {
+		return ;
+	}
 	switch (tolower(piece)) {
 		case PIECES::EMPTY:
 			return ;
@@ -335,53 +379,76 @@ void Chess::drawSquare( std::vector<int> &vertices, int type, int startX, int st
 	vertices.push_back(startY + square_size);
 }
 
-void Chess::drawBoard( std::vector<int> &vertices, int except, int square_size )
+void Chess::drawWaitingRoom( std::vector<int> &vertices, int mouseX, int mouseY, int square_size )
 {
-	// std::cout << "drawing board at origin " << startX << ", " << startY << " - size is " << width << ", " << height << std::endl;
 	for (int row = 0; row < 8; ++row) {
 		for (int col = 0; col < 8; ++col) {
-			drawSquare(vertices, !((row + col) & 0x1), square_size + col * square_size, square_size + row * square_size, square_size);
-			// std::cout << "row " << row << ", col " << col << ": " << static_cast<int>(_board[(row << 3) + col]) << std::endl;
+			int squareX = square_size + col * square_size + square_size / 2, squareY = square_size + row * square_size + square_size / 2;
+			int diffX = mouseX - squareX, diffY = mouseY - squareY;
+			squareX -= ((diffX >= 0) ? 1 : -1) * (diffX * diffX) / (square_size << 5);
+			squareY -= ((diffY >= 0) ? 1 : -1) *(diffY * diffY) / (square_size << 5);
+			drawSquare(vertices, !((row + col) & 0x1), squareX, squareY, square_size);
+		}
+	}
+}
+
+void Chess::drawBoard( std::vector<int> &vertices, int except, int square_size )
+{
+	for (int row = 0; row < 8; ++row) {
+		for (int col = 0; col < 8; ++col) {
+			drawSquare(vertices, !((row + col) & 0x1), square_size + col * square_size, square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size, square_size);
 			if ((row << 3) + col == except) {
-				continue ; // we skip square at index except
+				continue ; // we skip square at index 'except'
 			}
 			char piece = _board[(row << 3) + col];
 			if (piece != PIECES::EMPTY) {
-				drawSquare(vertices, texIndex(piece), square_size + col * square_size, square_size + row * square_size, square_size);
+				drawSquare(vertices, texIndex(piece), square_size + col * square_size, square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size, square_size);
 			}
 
 			if (_captured[(row << 3) + col]) {
-				drawSquare(vertices, (row + col) & 0x1, square_size + col * square_size + (square_size >> 2), square_size + row * square_size + (square_size >> 2), (square_size >> 1));
+				drawSquare(vertices, (row + col) & 0x1, square_size + col * square_size + (square_size >> 2), square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size + (square_size >> 2), (square_size >> 1));
 			}
 		}
 	}
-	// std::cout << "OVER\n\n" << std::endl;
 }
 
-// return {piece at, index of square} from mouse position on screen
-std::array<int, 2> Chess::getSelectedSquare( double mouseX, double mouseY, int square_size )
+// return {piece at, index of square, index of square} from mouse position on screen
+std::array<int, 3> Chess::getSelectedSquare( double mouseX, double mouseY, int square_size )
 {
 	int row = (mouseY - square_size) / square_size;
 	if (row < 0 || row >= 8) {
-		return {PIECES::EMPTY, -1};
+		return {PIECES::EMPTY, -1, -1};
 	}
 	int col = (mouseX - square_size) / square_size;
 	if (col < 0 || col >= 8) {
-		return {PIECES::EMPTY, -1};
+		return {PIECES::EMPTY, -1, -1};
 	}
-	return {_board[(row << 3) + col], (row << 3) + col};
+	row = (_color == TURN_WHITE) ? row : 7 - row;
+	int offset = (row << 3) + col;
+	return {_board[offset], offset, offset};
 }
 
 // only used for visual purposes
-// move piece to square untill server processes move
-void Chess::forceMovePiece( int src, int dst )
+// move piece to square until server processes move
+// rm nonsensical moves (eg when not your turn, when try take own piece, ..)
+bool Chess::forceMovePiece( int src, int dst )
 {
-	_board[dst] = _board[src];
+	if (src < 0 || src >= 64 || dst < 0 || dst >= 64) return (false);
+	int piece = _board[src], dest = _board[dst];
+	if (_color != _turn) { // not your turn
+		return (false);
+	}
+	if (dest != PIECES::EMPTY && isupper(piece) == isupper(dest)) { // autochess
+		return (false);
+	}
+	_board[dst] = piece;
 	_board[src] = PIECES::EMPTY;
+	return (true);
 }
 
-void Chess::movePiece( int src, int dst )
+void Chess::tryMovePiece( int src, int dst )
 {
+	if (src < 0 || src >= 64 || dst < 0 || dst >= 64) return ;
 	char piece = _board[src];
 	std::cout << _turn << " move " << piece << " from " << indexToStr(src) << " to " << indexToStr(dst) << std::endl;
 	if ((_turn == TURN_WHITE) ? !isupper(piece) : !islower(piece)) {
@@ -445,38 +512,8 @@ void Chess::movePiece( int src, int dst )
 		_board[dst] = tmp;
 		_board[dst + ((dst > src) ? -1 : 1)] = PIECES::EMPTY;
 		_board[dst + ((dst > src) ? 1 : -2)] = piece - 'K' + 'R';
-	} else {
+	} else { // move has been detected as legal, we procede to complete it
 		std::cout << "legal" << std::endl;
-		_turn = (_turn == TURN_WHITE) ? TURN_BLACK : TURN_WHITE;
-		if (tolower(piece) != PIECES::PAWN && tmp == PIECES::EMPTY) { // incr half moves if not pawn move and not capture (used for 50 moves rule)
-			++_half_moves;
-		} else {
-			_half_moves = 0;
-		}
-		_full_moves += _turn == TURN_WHITE;
-		if (tolower(piece) == PIECES::PAWN && (dst - src == 16 || dst - src == -16)) { // set en passant square for next move
-			_en_passant = indexToStr(dst + ((_turn == TURN_WHITE) ? -8 : 8));
-		} else {
-			_en_passant = "-";
-		}
-		if (tolower(piece) == PIECES::KING) { // rm castle privilieges
-			std::string castle;
-			for (auto c : _castle_state) {
-				if (c == piece || c == piece - 'K' + 'Q');
-				else castle += c;
-			}
-			_castle_state = castle;
-			if (!_castle_state[0]) _castle_state = "-";
-		} else if (tolower(piece) == PIECES::ROOK && (src == 0 || src == 7 || src == 63 || src == 56)) {
-			char rm = piece - 'R' + (!(src & 0x7) ? 'Q' : 'K');
-			std::cout << "rm " << rm << " from castle" << std::endl;
-			std::string castle;
-			for (auto c : _castle_state) {
-				if (c == rm);
-				else castle += c;
-			}
-			_castle_state = castle;
-			if (!_castle_state[0]) _castle_state = "-";
-		}
+		movePiece(src, dst, piece, tmp);
 	}
 }

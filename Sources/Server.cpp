@@ -4,7 +4,7 @@
 #include <sys/socket.h> // listen, accept, send, recv
 #include <unistd.h> // close
 
-Server::Server( void ) : _port(PORT), _chess(new Chess())
+Server::Server( void ) : _port(PORT)
 {
 	std::cout << "Server started, waiting for connections..." << std::endl;
 	_socket_fd = socket(AF_INET, SOCK_STREAM, 0);
@@ -16,7 +16,6 @@ Server::Server( void ) : _port(PORT), _chess(new Chess())
 Server::~Server( void )
 {
 	close(_socket_fd);
-	delete _chess;
 	std::cout << "Server closed" << std::endl;
 }
 
@@ -31,6 +30,49 @@ t_client Server::create_client( void )
 	return {++id, ""};
 }
 
+// look for empty place in current rooms, if no place found, create new room
+void Server::setClientInRoom( int id )
+{
+	for (auto &r : _rooms) {
+		if (!r.black) { // room found, game can start
+			r.modif = true;
+			r.black = id;
+			send(id, "col: b\n", 7, 0);
+			std::cout << id << " joined room with " << r.white << std::endl;
+			return ;
+		}
+	}
+	_rooms.push_back({id, 0, false, new Chess});
+	send(id, "col: w\n", 7, 0);
+	std::cout << id << " joined new room" << std::endl;
+}
+
+void Server::rmClientFromRoom( int id )
+{
+	for (auto it = _rooms.begin(); it != _rooms.end(); ++it) {
+		if (it->white == id) { // TODO send msg to other client
+			it->white = 0;
+			std::cout << id << " left his room" << std::endl;
+			if (!it->black) {
+				delete it->chess;
+				_rooms.erase(it);
+				std::cout << "room destroyed" << std::endl;
+			}
+			return ;
+		}
+		if (it->black == id) { // TODO send msg to other client
+			it->black = 0;
+			std::cout << id << " left his room" << std::endl;
+			if (!it->white) {
+				delete it->chess;
+				_rooms.erase(it);
+				std::cout << "room destroyed" << std::endl;
+			}
+			return ;
+		}
+	}
+}
+/*
 // broadcast msg to everyone on write set except sender
 void Server::broadcast( int fd, std::string msg, fd_set *wfds )
 {
@@ -40,11 +82,28 @@ void Server::broadcast( int fd, std::string msg, fd_set *wfds )
 		}
 	}
 	// std::cout << "Boadcasted " << msg << std::flush;
+}*/
+
+// loop through rooms and broadcast msg from rooms who need it
+void Server::roomsBroadcast( fd_set *wfds )
+{
+	for (auto &r : _rooms) {
+		if (r.modif) {
+			std::string msg = r.chess->getFEN();
+			if (FD_ISSET(r.white, wfds)) {
+				send(r.white, &msg[0], msg.size(), 0);
+			}
+			if (FD_ISSET(r.black, wfds)) {
+				send(r.black, &msg[0], msg.size(), 0);
+			}
+			r.modif = false;
+		}
+	}
 }
 
-void Server::parseClientInput( std::string str )
+void Server::parseClientInput( int client_id, std::string str )
 {
-	// if (!str.compare(0, 8, "button: ")) {
+	// if (!str.compare(0, 8, "button: ")) { // will be used for resign/draw offer/takebacks buttons
 	// 	broadcast(str.substr(8));
 	// } else {
 	int index = 0, x = 0, y = 0;
@@ -63,7 +122,12 @@ void Server::parseClientInput( std::string str )
 	int src = (xSign) ? -x : x;
 	int dst = (ySign) ? -y : y;
 	// std::cout << "move piece " << src << ", " << dst << std::endl;
-	_chess->movePiece(src, dst);
+	for (auto &r : _rooms) {
+		if (client_id == r.white || client_id == r.black) {
+			r.chess->tryMovePiece(src, dst);
+			r.modif = true;
+		}
+	}
 }
 
 void Server::bindSocket( void )
@@ -91,7 +155,6 @@ void Server::listenToClients( void )
 
 void Server::handleMessages( void )
 {
-	bool modif = false;
 	fd_set rfds = _fds; // set read and write fds to current fds
 	fd_set wfds = _fds;
 	FD_CLR(_socket_fd, &wfds); // rm fd from write fds (we don't send ourselve a message)
@@ -105,16 +168,12 @@ void Server::handleMessages( void )
 		_clients[cfd] = create_client();
 		FD_SET(cfd, &_fds);
 
-		modif = true;
-		std::cout << "server: client " << std::to_string(_clients[cfd].id) << ": got connection from " << inet_ntoa(addr.sin_addr) << " port " << ntohs(addr.sin_port) << std::endl;
-		std::string msg = _chess->getFEN();
-		send(cfd, &msg[0], msg.size(), 0);
+		setClientInRoom(cfd);
+		std::cout << "server: client " << _clients[cfd].id << ": got connection from " << inet_ntoa(addr.sin_addr) << " port " << ntohs(addr.sin_port) << std::endl;
 		return ;
 	}
 
 	// we skip ourself and fds not part of read set
-	// std::cout << "read size " << sizeof(rfds) << ", write size " << sizeof(wfds) << ", macro still " << FD_SETSIZE << std::endl;
-	// might want to loop through rfds and check if i != 0 for opti
 	for (int i = 0; i < FD_SETSIZE; i++) {
 		if (i == _socket_fd || !FD_ISSET(i, &rfds)) continue;
 
@@ -122,11 +181,11 @@ void Server::handleMessages( void )
 		ssize_t n = recv(i, buff, sizeof(buff), 0);
 
 		if (n == -1 || n == 0) { // client leaves
-			std::cout << "server: client " << std::to_string(_clients[i].id) << " just left" << std::endl;
-			// modif = true;
-			_clients[i] = {0, "", {0, 0}};
+			_clients[i] = {0, ""};
 			close(i);
 			FD_CLR(i, &_fds); // rm client from fd set
+			rmClientFromRoom(i);
+			std::cout << "server: client " << i << " just left" << std::endl;
 			continue;
 		}
 
@@ -137,18 +196,13 @@ void Server::handleMessages( void )
 			c.str += buff[j];
 			if (buff[j] == '\n') {
 				// std::cout << "received from client " << c.str << std::flush;
-				modif = true;
-				parseClientInput(c.str);
+				parseClientInput(i, c.str);
 				c.str = "";
 			}
 		}
 	}
 
-	if (!modif) {
-		return ;
-	}
-
-	broadcast(0, _chess->getFEN(), &wfds);
+	roomsBroadcast(&wfds);
 }
 
 // ************************************************************************** //

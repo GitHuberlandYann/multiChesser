@@ -18,7 +18,8 @@ namespace STATE
 {
 	enum {
 		MENU,
-		GAME
+		WAITING_ROOM,
+		INGAME
 	};
 }
 
@@ -38,7 +39,7 @@ class Display
 		Chess *_chess;
 		int _state, _port;
 		bool _mouse_pressed;
-		std::array<int, 2> _selected_piece; // {piece::value, starting_square}
+		std::array<int, 3> _selected_piece; // {piece::value, starting_square, draw piece square}
 		std::string _ip;
 
 		GLuint createShaderProgram( std::string vertex, std::string geometry, std::string fragment );

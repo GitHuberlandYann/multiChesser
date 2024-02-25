@@ -22,7 +22,7 @@ class Client
 		void setDisplay( Display *display );
 		void connectSocket( std::string ip, int port );
 		void setMsg( int src, int dst );
-		bool handleMessages( void );
+		void handleMessages( void );
 };
 
 #endif
