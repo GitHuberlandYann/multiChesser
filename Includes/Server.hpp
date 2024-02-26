@@ -1,7 +1,7 @@
 #ifndef SERVER_HPP
 # define SERVER_HPP
 
-# include "utils.hpp"
+# include "common.hpp"
 # include "Chess.hpp"
 # include <array>
 # include <list>
@@ -16,6 +16,8 @@ typedef struct s_client {
 typedef struct s_room {
 	int white = 0;
 	int black = 0;
+	std::string w_username = "";
+	std::string b_username = "";
 	bool modif = false;
 	Chess *chess;
 }				t_room;
@@ -30,6 +32,7 @@ class Server
 
 		t_client create_client( void );
 		void setClientInRoom( int id );
+		void setClientUsername( int id, std::string username );
 		void rmClientFromRoom( int id );
 		void roomsBroadcast( fd_set *wfds );
 		void parseClientInput( int client_id, std::string str );

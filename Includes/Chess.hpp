@@ -65,7 +65,7 @@ class Chess
 		void setBoard( std::string fen );
 		void setCaptures( int index );
 		void drawSquare( std::vector<int> &vertices, int type, int startX, int startY, int square_size );
-		void drawWaitingRoom( std::vector<int> &vertices, int mouseX, int mouseY, int square_size );
+		void drawWaitingRoom( std::vector<int> &vertices, int mouseX, int mouseY, int square_size, int win_width, int win_height );
 		void drawBoard( std::vector<int> &vertices, int except, int square_size );
 		std::array<int, 3> getSelectedSquare( double mouseX, double mouseY, int square_size );
 		bool forceMovePiece( int src, int dst );

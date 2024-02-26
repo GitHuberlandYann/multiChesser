@@ -379,14 +379,18 @@ void Chess::drawSquare( std::vector<int> &vertices, int type, int startX, int st
 	vertices.push_back(startY + square_size);
 }
 
-void Chess::drawWaitingRoom( std::vector<int> &vertices, int mouseX, int mouseY, int square_size )
+void Chess::drawWaitingRoom( std::vector<int> &vertices, int mouseX, int mouseY, int square_size, int win_width, int win_height )
 {
-	for (int row = 0; row < 8; ++row) {
-		for (int col = 0; col < 8; ++col) {
-			int squareX = square_size + col * square_size + square_size / 2, squareY = square_size + row * square_size + square_size / 2;
-			int diffX = mouseX - squareX, diffY = mouseY - squareY;
+	for (int row = 0; true; ++row) {
+		int squareY = row * square_size;
+		if (squareY > win_height) break ;
+		int diffY = mouseY - squareY - square_size / 2;
+		squareY -= ((diffY >= 0) ? 1 : -1) * (diffY * diffY) / (square_size << 5);
+		for (int col = 0; true; ++col) {
+			int squareX = col * square_size;
+			if (squareX > win_width) break ;
+			int diffX = mouseX - squareX - square_size / 2;
 			squareX -= ((diffX >= 0) ? 1 : -1) * (diffX * diffX) / (square_size << 5);
-			squareY -= ((diffY >= 0) ? 1 : -1) *(diffY * diffY) / (square_size << 5);
 			drawSquare(vertices, !((row + col) & 0x1), squareX, squareY, square_size);
 		}
 	}

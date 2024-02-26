@@ -20,7 +20,7 @@ class Client
 		~Client( void );
 
 		void setDisplay( Display *display );
-		void connectSocket( std::string ip, int port );
+		void connectSocket( std::string ip, int port, std::string username );
 		void setMsg( int src, int dst );
 		void handleMessages( void );
 };

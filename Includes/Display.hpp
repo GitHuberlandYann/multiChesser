@@ -1,32 +1,36 @@
 #ifndef DISPLAY_HPP
 # define DISPLAY_HPP
 
-# define GLEW_STATIC
-# include <GL/glew.h> // must be before glfw
-# include "GLFW/glfw3.h"
-
+# include "utils.hpp"
 # include "Client.hpp"
 # include "Chess.hpp"
+# include "Text.hpp"
 # include <vector>
 # include <array>
 
 # define GOLDEN_RATIO 1.6180339887
 # define WIN_HEIGHT 600
 # define WIN_WIDTH WIN_HEIGHT * GOLDEN_RATIO
+# define ALPHABETA " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~"
 
 namespace STATE
 {
 	enum {
 		MENU,
+		INPUT,
 		WAITING_ROOM,
 		INGAME
 	};
 }
 
-enum {
-	SPECATTRIB,
-	POSATTRIB
-};
+namespace SELECT
+{
+	enum {
+		NONE,
+		USERNAME,
+		PLAY
+	};
+}
 
 class Display
 {
@@ -37,34 +41,34 @@ class Display
 		GLuint *_texture;
 		Client *_client;
 		Chess *_chess;
-		int _state, _port;
+		Text *_text;
+		int _state, _port, _selection, _input_released;
+		std::string _username, _opponent_username;
 		bool _mouse_pressed;
 		std::array<int, 3> _selected_piece; // {piece::value, starting_square, draw piece square}
 		std::string _ip;
 
-		GLuint createShaderProgram( std::string vertex, std::string geometry, std::string fragment );
-		void check_glstate( std::string str, bool displayDebug );
-
 		void setup_window( void );
 		void create_shaders( void );
 		void setup_communication_shaders( void );
-		void loadSubTextureArray( int layer, std::string texture_file );
 		void load_texture( void );
 
+		void handleMenuInputs( void );
 		void handleInputs( void );
-		void draw_rectangles( void );
+		void drawRectangle( std::vector<int> &vertices, int type, int startX, int startY, int width, int height );
+		void draw( void );
 		void main_loop( void );
 
 	public:
 		Display( void );
 		~Display( void );
 
+		void setSelection( float posX, float posY );
 		void setIP( std::string ip );
 		void setPort( int port );
 		void setWindowSize( int width, int height );
-		void start( void );
-
 		void parseServerInput( std::string str );
+		void start( void );
 };
 
 #endif

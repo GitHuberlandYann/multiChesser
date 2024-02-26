@@ -1,20 +1,14 @@
 #include "Display.hpp"
-#include "utils.hpp"
 #include "callbacks.hpp"
-
-#include "SOIL/SOIL.h"
-typedef struct {
-	unsigned char *content;
-	int width;
-	int height;
-}				t_tex;
 
 Display::Display( void )
 	: _window(NULL), _winWidth(WIN_WIDTH), _winHeight(WIN_HEIGHT),
-		_texture(NULL), _client(NULL), _state(STATE::MENU), _port(PORT), _mouse_pressed(false),
+		_texture(NULL), _client(NULL), _state(STATE::MENU), _port(PORT),
+		_selection(0), _input_released(0), _mouse_pressed(false),
 		_selected_piece({PIECES::EMPTY, -1, -1}), _ip("localhost")
 {
 	_chess = new Chess();
+	_text = new Text();
 }
 
 Display::~Display( void )
@@ -34,92 +28,15 @@ Display::~Display( void )
 	glfwMakeContextCurrent(NULL);
     glfwTerminate();
 
-	delete _chess;
 	delete _client;
+	delete _chess;
+	delete _text;
 	check_glstate("Display successfully destructed", true);
 }
 
 // ************************************************************************** //
 //                                Private                                     //
 // ************************************************************************** //
-
-static void compile_shader( GLuint ptrShader, std::string name )
-{
-	glCompileShader(ptrShader);
-
-    GLint status;
-    glGetShaderiv(ptrShader, GL_COMPILE_STATUS, &status);
-	if (status) {
-		std::cout << name << " shader compiled successfully" << std::endl;
-	} else {
-		char buffer[512];
-		glGetShaderInfoLog(ptrShader, 512, NULL, buffer);
-
-		std::cerr << name << " shader did not compile, error log:" << std::endl << buffer << std::endl;
-		exit(1);
-	}
-}
-
-GLuint Display::createShaderProgram( std::string vertex, std::string geometry, std::string fragment )
-{
-	std::string vertex_shader_data = get_file_content("Sources/Shaders/" + vertex + ".glsl");
-	char *vertexSource = &vertex_shader_data[0];
-
-	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertexShader, 1, &vertexSource, NULL);
-	compile_shader(vertexShader, vertex);
-
-	GLuint geometryShader;
-	if (geometry[0]) {
-		std::string geometry_shader_data = get_file_content("Sources/Shaders/" + geometry + ".glsl");
-		char *geometrySource = &geometry_shader_data[0];
-
-		geometryShader = glCreateShader(GL_GEOMETRY_SHADER);
-		glShaderSource(geometryShader, 1, &geometrySource, NULL);
-		compile_shader(geometryShader, geometry);
-	}
-
-	std::string fragment_shader_data = get_file_content("Sources/Shaders/" + fragment + ".glsl");
-	char *fragmentSource = &fragment_shader_data[0];
-
-	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fragmentShader, 1, &fragmentSource, NULL);
-	compile_shader(fragmentShader, fragment);
-
-	// Combining shaders into a program
-	GLuint shaderProgram = glCreateProgram();
-	glAttachShader(shaderProgram, vertexShader);
-	if (geometry[0]) {
-		glAttachShader(shaderProgram, geometryShader);
-	}
-	glAttachShader(shaderProgram, fragmentShader);
-
-	glDeleteShader(fragmentShader);
-	if (geometry[0]) {
-		glDeleteShader(geometryShader);
-	}
-    glDeleteShader(vertexShader);
-
-	return (shaderProgram);
-}
-
-void Display::check_glstate( std::string str, bool displayDebug )
-{
-	GLenum error_check = glGetError();	
-	if (error_check) {
-		std::cerr << "glGetError set to " << error_check << " when trying to " << str << ", quitting now" << std::endl;
-		exit(1);
-	}
-	if (displayDebug) {
-		std::cout << str << std::endl;
-	}
-}
-
-void error_callback( int error, const char *msg ) {
-    std::string s;
-    s = " [" + std::to_string(error) + "] " + msg + '\n';
-    std::cerr << s << std::endl;
-}
 
 void Display::setup_window( void )
 {
@@ -163,6 +80,8 @@ void Display::setup_window( void )
 
 void Display::create_shaders( void )
 {
+	_text->setup_shader();
+
 	_shaderProgram = createShaderProgram("vertex", "", "fragment");
 
 	glBindFragDataLocation(_shaderProgram, 0, "outColor");
@@ -178,6 +97,8 @@ void Display::create_shaders( void )
 
 void Display::setup_communication_shaders( void )
 {
+	_text->setup_communication_shaders();
+
 	_uniWidth = glGetUniformLocation(_shaderProgram, "win_width");
 	_uniHeight = glGetUniformLocation(_shaderProgram, "win_height");
 	setWindowSize(_winWidth, _winHeight);
@@ -189,39 +110,11 @@ void Display::setup_communication_shaders( void )
 	check_glstate("VAO and VBO", false);
 }
 
-void Display::loadSubTextureArray( int layer, std::string texture_file )
-{
-	// load image
-	t_tex img;
-	img.content = SOIL_load_image(texture_file.c_str(), &img.width, &img.height, 0, SOIL_LOAD_RGBA);
-	if (!img.content) {
-		std::cerr << "failed to load image " << texture_file << " because:" << std::endl << SOIL_last_result() << std::endl;
-		exit(1);
-	}
-
-	if (img.width != 300 || img.height != 300) {
-		std::cerr << texture_file << ": image size not 300x300 but " << img.width << "x" << img.height << std::endl;
-		exit(1);
-	}
-	// Upload pixel data.
-	// The first 0 refers to the mipmap level (level 0, since there's only 1)
-	// The following 2 zeroes refers to the x and y offsets in case you only want to specify a subrectangle.
-	// 300x300 size of rect, 1 = depth of layer
-	glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, layer, img.width, img.height, 1, GL_RGBA, GL_UNSIGNED_BYTE, img.content);
-			
-	// set settings for texture wraping and size modif
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-	SOIL_free_image_data(img.content);
-
-	check_glstate("Succesfully loaded " + texture_file + " to shader", true);
-}
-
 void Display::load_texture( void )
 {
+	_text->load_texture();
+	glUseProgram(_shaderProgram);
+
 	_texture = new GLuint[1];
 	glGenTextures(1, _texture);
 
@@ -249,6 +142,52 @@ void Display::load_texture( void )
 	loadSubTextureArray(13, "Resources/bp.png");
 	glUniform1i(glGetUniformLocation(_shaderProgram, "pieces"), 0);
 	check_glstate("texture_2D_array done", true);
+}
+
+void Display::handleMenuInputs( void )
+{
+	if (glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+		std::string username = INPUT::getCurrentMessage();
+		double mouseX, mouseY;
+		glfwGetCursorPos(_window, &mouseX, &mouseY);
+		if (_selection == SELECT::USERNAME) {
+			_state = STATE::INPUT;
+			glfwSetCharCallback(_window, INPUT::character_callback);
+		} else if (_selection == SELECT::PLAY && username[0]) {
+			_username = username;
+			glfwSetCharCallback(_window, NULL);
+			glfwSetCursorPosCallback(_window, NULL);
+			_client = new Client();
+			_client->setDisplay(this);
+			_client->connectSocket(_ip, _port, username);
+			// std::cout << "debug after connect" << std::endl;
+			_state = STATE::WAITING_ROOM;
+			glfwSetWindowTitle(_window, "Waiting room.");
+		} else {
+			_state = STATE::MENU;
+			glfwSetCharCallback(_window, NULL);
+		}
+	}
+
+	if (_state == STATE::INPUT) {
+		if (++_input_released == 1 && glfwGetKey(_window, GLFW_KEY_BACKSPACE) == GLFW_PRESS) {
+			INPUT::rmLetter();
+		}
+		if (_input_released == 1 && glfwGetKey(_window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+			INPUT::moveCursor(true, glfwGetKey(_window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS);
+		}
+		if (_input_released == 1 && glfwGetKey(_window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+			INPUT::moveCursor(false, glfwGetKey(_window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS);
+		}
+		if (glfwGetKey(_window, GLFW_KEY_BACKSPACE) == GLFW_RELEASE
+			&& glfwGetKey(_window, GLFW_KEY_RIGHT) == GLFW_RELEASE && glfwGetKey(_window, GLFW_KEY_LEFT) == GLFW_RELEASE) {
+			_input_released = 0;
+		}
+		if (glfwGetKey(_window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+			_state = STATE::MENU;
+			glfwSetCharCallback(_window, NULL);
+		}
+	}
 }
 
 void Display::handleInputs( void )
@@ -299,40 +238,78 @@ void Display::handleInputs( void )
 	}
 }
 
-void Display::draw_rectangles( void )
+void Display::drawRectangle( std::vector<int> &vertices, int type, int startX, int startY, int width, int height )
 {
-	if (_client) {
-		std::vector<int> vertices;
-		switch (_state) {
-			case STATE::WAITING_ROOM:
+	// std::cout << "rectangle with layer " << type << std::endl;
+	vertices.push_back(0 + (0 << 1) + (type << 2));
+	vertices.push_back(startX);
+	vertices.push_back(startY);
+	vertices.push_back(1 + (0 << 1) + (type << 2));
+	vertices.push_back(startX + width);
+	vertices.push_back(startY);
+	vertices.push_back(0 + (1 << 1) + (type << 2));
+	vertices.push_back(startX);
+	vertices.push_back(startY + height);
+
+	vertices.push_back(1 + (0 << 1) + (type << 2));
+	vertices.push_back(startX + width);
+	vertices.push_back(startY);
+	vertices.push_back(1 + (1 << 1) + (type << 2));
+	vertices.push_back(startX + width);
+	vertices.push_back(startY + height);
+	vertices.push_back(0 + (1 << 1) + (type << 2));
+	vertices.push_back(startX);
+	vertices.push_back(startY + height);
+}
+
+void Display::draw( void )
+{
+	std::vector<int> vertices;
+	std::string username;
+	int gui_size;
+	switch (_state) {
+		case STATE::INPUT:
+			username = INPUT::getCurrentInputStr('|');
+		case STATE::MENU:
+			if (!username[0]) username = INPUT::getCurrentMessage();
+			gui_size = _squareSize / 3;
+			_text->addText(_winWidth / 4 + gui_size, _winHeight / 4 - gui_size * 1.25f, 2 * gui_size / 3, true, "Username");
+			_text->addText(_winWidth / 2 - 0.5f * gui_size * username.size(), _winHeight / 4 + (_squareSize - gui_size) / 2, gui_size, true, username);
+			_text->addText(_winWidth / 2 - 2 * gui_size - 1, 3 * _winHeight / 4 - (_squareSize + 4 * gui_size / 3) / 2 - 1, 4 * gui_size / 3, false, "PLAY");
+			_text->addText(_winWidth / 2 - 2 * gui_size, 3 * _winHeight / 4 - (_squareSize + 4 * gui_size / 3) / 2, 4 * gui_size / 3, true, "PLAY");
+			drawRectangle(vertices, 0, _winWidth / 4, _winHeight / 4, _winWidth / 2, _squareSize);
+			drawRectangle(vertices, _selection == SELECT::PLAY && username.size() > 1, _winWidth / 4, 3 * _winHeight / 4 - _squareSize, _winWidth / 2, _squareSize);
+			break ;
+		case STATE::WAITING_ROOM:
+			double mouseX, mouseY;
+			glfwGetCursorPos(_window, &mouseX, &mouseY);
+			_chess->drawWaitingRoom(vertices, mouseX, mouseY, _squareSize, _winWidth, _winHeight);
+			break ;
+		case STATE::INGAME:
+			_text->addText(_squareSize * 5 - _squareSize / 6 * _username.size(), _winHeight - 4 * _squareSize / 5, _squareSize / 3, true, _username);
+			_text->addText(_squareSize * 5 - _squareSize / 6 * _opponent_username.size(), 4 * _squareSize / 5 - _squareSize / 3, _squareSize / 3, true, _opponent_username);
+			_chess->drawBoard(vertices, _selected_piece[2], _squareSize);
+			if (_selected_piece[2] != -1) {
 				double mouseX, mouseY;
 				glfwGetCursorPos(_window, &mouseX, &mouseY);
-				_chess->drawWaitingRoom(vertices, mouseX, mouseY, _squareSize);
-				break ;
-			case STATE::INGAME:
-				_chess->drawBoard(vertices, _selected_piece[2], _squareSize);
-				if (_selected_piece[2] != -1) {
-					double mouseX, mouseY;
-					glfwGetCursorPos(_window, &mouseX, &mouseY);
-					_chess->drawSquare(vertices, _chess->texIndex(_selected_piece[0]), mouseX - (_squareSize >> 1), mouseY - (_squareSize >> 1), _squareSize);
-				}
-				break ;
-		}
-		glUseProgram(_shaderProgram);
-		glBindVertexArray(_vao);
-
-		glBindBuffer(GL_ARRAY_BUFFER, _vbo);
-		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLint), &(vertices[0]), GL_STATIC_DRAW);
-
-		glEnableVertexAttribArray(SPECATTRIB);
-		glVertexAttribIPointer(SPECATTRIB, 1, GL_INT, 3 * sizeof(GLint), 0);
-		glEnableVertexAttribArray(POSATTRIB);
-		glVertexAttribIPointer(POSATTRIB, 2, GL_INT, 3 * sizeof(GLint), (void *)(1 * sizeof(GLint)));
-
-		check_glstate("Display::draw_rectangles", false);
-		glDrawArrays(GL_TRIANGLES, 0, vertices.size() / 3);
-		// std::cout << "displaying resctangless " << vertices.size() << std::endl;
+				_chess->drawSquare(vertices, _chess->texIndex(_selected_piece[0]), mouseX - (_squareSize >> 1), mouseY - (_squareSize >> 1), _squareSize);
+			}
+			break ;
 	}
+	glUseProgram(_shaderProgram);
+	glBindVertexArray(_vao);
+
+	glBindBuffer(GL_ARRAY_BUFFER, _vbo);
+	glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(GLint), &(vertices[0]), GL_STATIC_DRAW);
+	
+	glEnableVertexAttribArray(SPECATTRIB);
+	glVertexAttribIPointer(SPECATTRIB, 1, GL_INT, 3 * sizeof(GLint), 0);
+	glEnableVertexAttribArray(POSATTRIB);
+	glVertexAttribIPointer(POSATTRIB, 2, GL_INT, 3 * sizeof(GLint), (void *)(1 * sizeof(GLint)));
+	
+	check_glstate("Display::draw", false);
+	glDrawArrays(GL_TRIANGLES, 0, vertices.size() / 3);
+	// std::cout << "displaying resctangless " << vertices.size() << std::endl;
 }
 
 void Display::main_loop( void )
@@ -341,25 +318,21 @@ void Display::main_loop( void )
 	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glfwSwapInterval(1);
 	glClearColor(0, 0, 0, 1.0f);
-	set_window_size_callback(this);
+	set_display_callback(this);
 	glfwSetWindowSizeCallback(_window, window_size_callback);
+	glfwSetCursorPosCallback(_window, cursor_position_callback);
 
 	check_glstate("setup done, entering main loop\n", true);
 
 	while (!glfwWindowShouldClose(_window)) {
-		if (glfwGetKey(_window, GLFW_KEY_BACKSPACE) == GLFW_PRESS) {
+		if (glfwGetKey(_window, GLFW_KEY_BACKSPACE) == GLFW_PRESS && _state != STATE::INPUT) {
 			glfwSetWindowShouldClose(_window, GL_TRUE);
 			continue ;
 		}
 		switch (_state) {
 			case STATE::MENU:
-				if (glfwGetKey(_window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-					_client = new Client();
-					_client->setDisplay(this);
-					_client->connectSocket(_ip, _port);
-					// std::cout << "debug after connect" << std::endl;
-					_state = STATE::WAITING_ROOM;
-				}
+			case STATE::INPUT:
+				handleMenuInputs();
 				break ;
 			case STATE::WAITING_ROOM:
 				_client->handleMessages();
@@ -372,7 +345,8 @@ void Display::main_loop( void )
 				break ;
 		}
 		glClear(GL_COLOR_BUFFER_BIT);
-		draw_rectangles();
+		draw();
+		_text->toScreen();
 		glfwSwapBuffers(_window);
 		glfwPollEvents();
 	}
@@ -381,6 +355,22 @@ void Display::main_loop( void )
 // ************************************************************************** //
 //                                Public                                      //
 // ************************************************************************** //
+
+static bool inRectangle( float posX, float posY, int rx, int ry, int width, int height )
+{
+	return (posX >= rx && posX <= rx + width && posY >= ry && posY <= ry + height);
+}
+
+void Display::setSelection( float posX, float posY )
+{
+	if (inRectangle(posX, posY, _winWidth / 4, _winHeight / 4, _winWidth / 2, _squareSize)) {
+		_selection = SELECT::USERNAME;
+	} else if (inRectangle(posX, posY, _winWidth / 4, 3 * _winHeight / 4 - _squareSize, _winWidth / 2, _squareSize)) {
+		_selection = SELECT::PLAY;
+	} else {
+		_selection = SELECT::NONE;
+	}
+}
 
 void Display::setIP( std::string ip )
 {
@@ -394,12 +384,37 @@ void Display::setPort( int port )
 
 void Display::setWindowSize( int width, int height )
 {
+	_text->setWindowSize(width, height);
+	glUseProgram(_shaderProgram);
+
 	_winWidth = width;
 	glUniform1i(_uniWidth, width);
 	_winHeight = height;
 	glUniform1i(_uniHeight, height);
 	_squareSize = (width / GOLDEN_RATIO < height) ? width / GOLDEN_RATIO : height;
 	_squareSize /= 10;
+}
+
+void Display::parseServerInput( std::string str )
+{
+	std::cout << str << std::flush;
+	if (!str.compare(0, 5, "FEN: ")) {
+		if (_state == STATE::WAITING_ROOM) {
+			_state = STATE::INGAME;
+			glfwSetWindowTitle(_window, "multiChesser");
+		}
+		_chess->setBoard(str.substr(5));
+		_chess->setCaptures(-1);
+	} else if (!str.compare(0, 5, "col: ")) {
+		_chess->setColor(str[5]);
+	} else if (!str.compare(0, 5, "OPP: ")) {
+		_opponent_username = str.substr(5, str.size() - 6);
+	}
+	// else if (!str.compare(0, 5, "PGN: ")) {
+	// 	_chess->setPGN(str);
+	// } else if (!str.compare(0, 5, "MSG: ")) { // msg from opponent
+	// } else if  (!str.compare(0, 5, "END: ")) { // game ended (checkmate / draw / pat / repetition / resign / deconnection)
+	// }
 }
 
 void Display::start( void )
@@ -409,23 +424,4 @@ void Display::start( void )
 	setup_communication_shaders();
 	load_texture();
 	main_loop();
-}
-
-void Display::parseServerInput( std::string str )
-{
-	std::cout << str << std::flush;
-	if (!str.compare(0, 5, "FEN: ")) {
-		if (_state == STATE::WAITING_ROOM) {
-			_state = STATE::INGAME;
-		}
-		_chess->setBoard(str.substr(5));
-		_chess->setCaptures(-1);
-	} else if (!str.compare(0, 5, "col: ")) {
-		_chess->setColor(str[5]);
-	}
-	// else if (!str.compare(0, 5, "PGN: ")) {
-	// 	_chess->setPGN(str);
-	// } else if (!str.compare(0, 5, "MSG: ")) { // msg from opponent
-	// } else if  (!str.compare(0, 5, "END: ")) { // game ended (checkmate / draw / pat / repetition / resign / deconnection)
-	// }
 }

@@ -35,7 +35,7 @@ void Client::setDisplay( Display *display )
 	_display = display;
 }
 
-void Client::connectSocket( std::string ip, int port )
+void Client::connectSocket( std::string ip, int port, std::string username )
 {
 	struct hostent *server = gethostbyname(ip.c_str());
 	if (!server) {
@@ -54,6 +54,9 @@ void Client::connectSocket( std::string ip, int port )
 
 	FD_ZERO(&_fds);
 	FD_SET(_socket_fd, &_fds); // put fd in fd set
+
+	username = "username: " + username + '\n';
+	send(_socket_fd, username.c_str(), username.size(), 0);
 }
 
 void Client::setMsg( int src, int dst )

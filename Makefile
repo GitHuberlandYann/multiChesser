@@ -3,8 +3,8 @@ CLI_NAME		= client
 OBJS_DIR		= Objs
 SRCS_DIR		= Sources
 
-FILES_SERVER	= main_server Chess Server utils
-FILES_CLIENT	= main_client callbacks Chess Display Client utils
+FILES_SERVER	= main_server Chess Server
+FILES_CLIENT	= main_client callbacks Chess Client Display Text utils
 
 SER_SRCS			= $(addprefix $(SRCS_DIR)/, $(addsuffix .cpp, $(FILES_SERVER)))
 SER_OBJS 			= $(addprefix $(OBJS_DIR)/, $(addsuffix .o, $(FILES_SERVER)))

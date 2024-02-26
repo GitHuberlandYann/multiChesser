@@ -35,16 +35,42 @@ void Server::setClientInRoom( int id )
 {
 	for (auto &r : _rooms) {
 		if (!r.black) { // room found, game can start
-			r.modif = true;
 			r.black = id;
 			send(id, "col: b\n", 7, 0);
 			std::cout << id << " joined room with " << r.white << std::endl;
 			return ;
 		}
 	}
-	_rooms.push_back({id, 0, false, new Chess});
+	_rooms.push_back({id, 0, "", "", false, new Chess});
 	send(id, "col: w\n", 7, 0);
 	std::cout << id << " joined new room" << std::endl;
+}
+
+void Server::setClientUsername( int id, std::string username )
+{
+	for (auto &r : _rooms) {
+		if (id == r.white) {
+			r.w_username = username;
+			if (r.b_username[0]) {
+				std::string msg = "OPP: " + r.b_username + '\n';
+				send(id, &msg[0], msg.size(), 0);
+				msg = "OPP: " + r.w_username + '\n';
+				send(r.black, &msg[0], msg.size(), 0);
+				r.modif = true; // game can start
+			}
+			return ;
+		} else if (id == r.black) {
+			r.b_username = username;
+			if (r.w_username[0]) {
+				std::string msg = "OPP: " + r.b_username + '\n';
+				send(r.white, &msg[0], msg.size(), 0);
+				msg = "OPP: " + r.w_username + '\n';
+				send(id, &msg[0], msg.size(), 0);
+				r.modif = true; // game can start
+			}
+			return ;
+		}
+	}
 }
 
 void Server::rmClientFromRoom( int id )
@@ -106,26 +132,30 @@ void Server::parseClientInput( int client_id, std::string str )
 	// if (!str.compare(0, 8, "button: ")) { // will be used for resign/draw offer/takebacks buttons
 	// 	broadcast(str.substr(8));
 	// } else {
-	int index = 0, x = 0, y = 0;
-	bool xSign = false, ySign = false;
-	if (str[index] == '-') {
-		xSign = true;
+	if (!str.compare(0, 10, "username: ")) {
+		setClientUsername(client_id, str.substr(10, str.size() - 11));
+	} else {
+		int index = 0, x = 0, y = 0;
+		bool xSign = false, ySign = false;
+		if (str[index] == '-') {
+			xSign = true;
+			++index;
+		}
+		for (; isdigit(str[index]); ++index) x = x * 10 + str[index] - '0';
 		++index;
-	}
-	for (; isdigit(str[index]); ++index) x = x * 10 + str[index] - '0';
-	++index;
-	if (str[index] == '-') {
-		ySign = true;
-		++index;
-	}
-	for (; isdigit(str[index]); ++index) y = y * 10 + str[index] - '0';
-	int src = (xSign) ? -x : x;
-	int dst = (ySign) ? -y : y;
-	// std::cout << "move piece " << src << ", " << dst << std::endl;
-	for (auto &r : _rooms) {
-		if (client_id == r.white || client_id == r.black) {
-			r.chess->tryMovePiece(src, dst);
-			r.modif = true;
+		if (str[index] == '-') {
+			ySign = true;
+			++index;
+		}
+		for (; isdigit(str[index]); ++index) y = y * 10 + str[index] - '0';
+		int src = (xSign) ? -x : x;
+		int dst = (ySign) ? -y : y;
+		// std::cout << "move piece " << src << ", " << dst << std::endl;
+		for (auto &r : _rooms) {
+			if (client_id == r.white || client_id == r.black) {
+				r.chess->tryMovePiece(src, dst);
+				r.modif = true;
+			}
 		}
 	}
 }
@@ -221,4 +251,14 @@ void Server::start( void )
 	while (true) {
 		handleMessages();
 	}
+}
+
+// ************************************************************************** //
+//                                Common                                      //
+// ************************************************************************** //
+
+void error( std::string str )
+{
+	std::cerr << str << std::endl;
+	exit(EXIT_FAILURE);
 }
