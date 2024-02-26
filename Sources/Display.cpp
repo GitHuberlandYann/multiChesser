@@ -124,45 +124,38 @@ void Display::load_texture( void )
 	// alocate pixel data
 	// mipmap level set to 1
 	// works because all images are 300x300
-	// layerCount is 12 (6 whites and 6 black pieces)
-	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGBA8, 300, 300, 14);
-	loadSubTextureArray(0, "Resources/back_black.png");
-	loadSubTextureArray(1, "Resources/back_white.png");
-	loadSubTextureArray(2, "Resources/wk.png");
-	loadSubTextureArray(3, "Resources/wq.png");
-	loadSubTextureArray(4, "Resources/wr.png");
-	loadSubTextureArray(5, "Resources/wb.png");
-	loadSubTextureArray(6, "Resources/wn.png");
-	loadSubTextureArray(7, "Resources/wp.png");
-	loadSubTextureArray(8, "Resources/bk.png");
-	loadSubTextureArray(9, "Resources/bq.png");
-	loadSubTextureArray(10, "Resources/br.png");
-	loadSubTextureArray(11, "Resources/bb.png");
-	loadSubTextureArray(12, "Resources/bn.png");
-	loadSubTextureArray(13, "Resources/bp.png");
+	// layerCount is 15 (black + white + 6 white pieces + 6 black pieces + highlight)
+	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGBA8, 300, 300, 15);
+	loadSubTextureArray(TEXTURE::BLACK_SQUARE, "Resources/back_black.png");
+	loadSubTextureArray(TEXTURE::WHITE_SQUARE, "Resources/back_white.png");
+	loadSubTextureArray(TEXTURE::WHITE_KING, "Resources/wk.png");
+	loadSubTextureArray(TEXTURE::WHITE_QUEEN, "Resources/wq.png");
+	loadSubTextureArray(TEXTURE::WHITE_ROOK, "Resources/wr.png");
+	loadSubTextureArray(TEXTURE::WHITE_BISHOP, "Resources/wb.png");
+	loadSubTextureArray(TEXTURE::WHITE_KNIGHT, "Resources/wn.png");
+	loadSubTextureArray(TEXTURE::WHITE_PAWN, "Resources/wp.png");
+	loadSubTextureArray(TEXTURE::BLACK_KING, "Resources/bk.png");
+	loadSubTextureArray(TEXTURE::BLACK_QUEEN, "Resources/bq.png");
+	loadSubTextureArray(TEXTURE::BLACK_ROOK, "Resources/br.png");
+	loadSubTextureArray(TEXTURE::BLACK_BISHOP, "Resources/bb.png");
+	loadSubTextureArray(TEXTURE::BLACK_KNIGHT, "Resources/bn.png");
+	loadSubTextureArray(TEXTURE::BLACK_PAWN, "Resources/bp.png");
+	loadSubTextureArray(TEXTURE::MOVE_HIGHLIGHT, "Resources/highlight.png");
 	glUniform1i(glGetUniformLocation(_shaderProgram, "pieces"), 0);
 	check_glstate("texture_2D_array done", true);
 }
 
 void Display::handleMenuInputs( void )
 {
+	std::string username = INPUT::getCurrentMessage();
 	if (glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-		std::string username = INPUT::getCurrentMessage();
 		double mouseX, mouseY;
 		glfwGetCursorPos(_window, &mouseX, &mouseY);
 		if (_selection == SELECT::USERNAME) {
 			_state = STATE::INPUT;
 			glfwSetCharCallback(_window, INPUT::character_callback);
 		} else if (_selection == SELECT::PLAY && username[0]) {
-			_username = username;
-			glfwSetCharCallback(_window, NULL);
-			glfwSetCursorPosCallback(_window, NULL);
-			_client = new Client();
-			_client->setDisplay(this);
-			_client->connectSocket(_ip, _port, username);
-			// std::cout << "debug after connect" << std::endl;
-			_state = STATE::WAITING_ROOM;
-			glfwSetWindowTitle(_window, "Waiting room.");
+			goto WAITING_ROOM;
 		} else {
 			_state = STATE::MENU;
 			glfwSetCharCallback(_window, NULL);
@@ -186,8 +179,21 @@ void Display::handleMenuInputs( void )
 		if (glfwGetKey(_window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 			_state = STATE::MENU;
 			glfwSetCharCallback(_window, NULL);
+		} else if (glfwGetKey(_window, GLFW_KEY_ENTER) == GLFW_PRESS && username[0]) {
+			goto WAITING_ROOM;
 		}
 	}
+	return ;
+	WAITING_ROOM:
+	_username = username;
+	glfwSetCharCallback(_window, NULL);
+	glfwSetCursorPosCallback(_window, NULL);
+	_client = new Client();
+	_client->setDisplay(this);
+	_client->connectSocket(_ip, _port, username);
+	// std::cout << "debug after connect" << std::endl;
+	_state = STATE::WAITING_ROOM;
+	glfwSetWindowTitle(_window, "Waiting room.");
 }
 
 void Display::handleInputs( void )
@@ -205,14 +211,14 @@ void Display::handleInputs( void )
 		} else {
 			std::array<int, 3> dst = _chess->getSelectedSquare(mouseX, mouseY, _squareSize);
 			if (dst[1] == _selected_piece[1]) {
+				_selected_piece = dst;
+				return ;
 			} else if (_chess->forceMovePiece(_selected_piece[1], dst[1])) {
 				_client->setMsg(_selected_piece[1], dst[1]);
 			} else {
 				_selected_piece = dst;
-				_chess->setCaptures(-1);
 				return ;
 			}
-			_chess->setCaptures(-1);
 			_selected_piece = {PIECES::EMPTY, -1, -1};
 		}
 		// std::cout << "piece " << _selected_piece[0] << " at " << _selected_piece[1] << std::endl;

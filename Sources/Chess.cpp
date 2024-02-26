@@ -3,7 +3,7 @@
 
 Chess::Chess( void )
 	: _board(PIECES::board_init), _castle_state("KQkq"), _en_passant("-"),
-	_half_moves(0), _full_moves(1), _turn(TURN_WHITE), _color(TURN_WHITE)
+	_half_moves(0), _full_moves(1), _last_move({-1, -1}), _turn(TURN_WHITE), _color(TURN_WHITE)
 {
 	_captured.fill(false);
 }
@@ -234,13 +234,31 @@ std::string Chess::indexToStr( int index )
 	return (res);
 }
 
+void Chess::updateHistoric( void )
+{
+	if (!_game_history.size()) {
+		_game_history.push_back(_board);
+	} else if (_game_history.back() != _board) {
+		for (int index = 0, i = 0; index < 2; ++index) {
+			for (; i < 64; ++i) {
+				if (_board[i] != _game_history.back()[i]) {
+					std::cout << "last move " << index << ": " << indexToStr(i) << std::endl;
+					_last_move[index] = i++; // used to highlight squares
+					break ;
+				}
+			}
+		}
+		_game_history.push_back(_board);
+	}
+}
+
 // ************************************************************************** //
 //                                Public                                      //
 // ************************************************************************** //
 
 int Chess::texIndex( char piece )
 {
-	int res = isupper(piece) ? 2 : 8;
+	int res = isupper(piece) ? TEXTURE::WHITE_KING : TEXTURE::BLACK_KING;
 	switch (tolower(piece)) {
 		case PIECES::KING:
 			return (res + 0);
@@ -255,7 +273,7 @@ int Chess::texIndex( char piece )
 		case PIECES::PAWN:
 			return (res + 5);
 	}
-	return (0);
+	return (TEXTURE::BLACK_SQUARE);
 }
 
 // Forsyth-Edwards Notation rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
@@ -307,6 +325,7 @@ void Chess::setBoard( std::string fen )
 			_board[bi++] = fen[i];
 		}
 	}
+	updateHistoric();
 	_turn = fen[i + 1];
 	i += 3;
 	_castle_state = "";
@@ -400,16 +419,21 @@ void Chess::drawBoard( std::vector<int> &vertices, int except, int square_size )
 {
 	for (int row = 0; row < 8; ++row) {
 		for (int col = 0; col < 8; ++col) {
-			drawSquare(vertices, !((row + col) & 0x1), square_size + col * square_size, square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size, square_size);
-			if ((row << 3) + col == except) {
+			int square = (row << 3) + col;
+			if (square == _last_move[0] || square == _last_move[1]) {
+				drawSquare(vertices, TEXTURE::MOVE_HIGHLIGHT, square_size + col * square_size, square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size, square_size);
+			} else {
+				drawSquare(vertices, !((row + col) & 0x1), square_size + col * square_size, square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size, square_size);
+			}
+			if (square == except) {
 				continue ; // we skip square at index 'except'
 			}
-			char piece = _board[(row << 3) + col];
+			char piece = _board[square];
 			if (piece != PIECES::EMPTY) {
 				drawSquare(vertices, texIndex(piece), square_size + col * square_size, square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size, square_size);
 			}
 
-			if (_captured[(row << 3) + col]) {
+			if (_captured[square]) {
 				drawSquare(vertices, (row + col) & 0x1, square_size + col * square_size + (square_size >> 2), square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size + (square_size >> 2), (square_size >> 1));
 			}
 		}

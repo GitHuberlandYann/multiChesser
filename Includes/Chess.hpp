@@ -32,13 +32,35 @@ namespace PIECES
 	const std::string board_init = "rnbqkbnrpppppppp00000000000000000000000000000000PPPPPPPPRNBQKBNR";
 }
 
+namespace TEXTURE
+{
+	enum {
+		BLACK_SQUARE,
+		WHITE_SQUARE,
+		WHITE_KING,
+		WHITE_QUEEN,
+		WHITE_ROOK,
+		WHITE_BISHOP,
+		WHITE_KNIGHT,
+		WHITE_PAWN,
+		BLACK_KING,
+		BLACK_QUEEN,
+		BLACK_ROOK,
+		BLACK_BISHOP,
+		BLACK_KNIGHT,
+		BLACK_PAWN,
+		MOVE_HIGHLIGHT
+	};
+}
+
 class Chess
 {
 	private:
 		std::string _board, _castle_state, _en_passant;
 		int _half_moves, _full_moves;
 		std::array<bool, 64> _captured;
-		std::vector<std::array<char, 64>> _history;
+		std::vector<std::string> _game_history;
+		std::array<int, 2> _last_move;
 		char _turn, _color;
 
 		bool addCapture( int row, int col, bool empty_allowed = true, bool capture_allowed = true );
@@ -54,6 +76,7 @@ class Chess
 		void movePiece( int src, int dst, char src_piece, char dst_piece );
 
 		std::string indexToStr( int index );
+		void updateHistoric( void );
 
 	public:
 		Chess( void );
