@@ -369,6 +369,10 @@ void Display::main_loop( void )
 				// std::cout << "over" << std::endl;
 				break ;
 			case STATE::ENDGAME:
+				if (_client) {
+					delete _client;
+					_client = NULL;
+				}
 				handleInputs();
 				break ;
 		}
@@ -446,8 +450,6 @@ void Display::parseServerInput( std::string str )
 		_opponent_username = str.substr(5, str.size() - 6);
 	} else if (!str.compare(0, 5, "END: ")) { // game ended (checkmate / draw / pat / repetition / resign / deconnection)
 		_state = STATE::ENDGAME;
-		delete _client;
-		_client = NULL;
 	}
 	// else if (!str.compare(0, 5, "PGN: ")) {
 	// 	_chess->setPGN(str);
