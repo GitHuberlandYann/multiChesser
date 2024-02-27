@@ -49,7 +49,7 @@ void Client::connectSocket( std::string ip, int port, std::string username )
 	std::cout << "serv addr " << inet_ntoa(addr.sin_addr) << " port " << ntohs(addr.sin_port) << std::endl;
 
 	if (connect(_socket_fd, (struct sockaddr *) &addr, sizeof(addr)) == -1) {
-		error("Fatal error connect");
+		error("Fatal error connect, is the server running ?");
 	}
 
 	FD_ZERO(&_fds);

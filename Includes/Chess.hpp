@@ -57,9 +57,10 @@ class Chess
 {
 	private:
 		std::string _board, _castle_state, _en_passant;
-		int _half_moves, _full_moves;
+		int _half_moves, _full_moves, _current_board;
 		std::array<bool, 64> _captured;
 		std::vector<std::string> _game_history;
+		std::vector<std::array<int, 2>> _premoves;
 		std::array<int, 2> _last_move;
 		char _turn, _color;
 
@@ -77,6 +78,7 @@ class Chess
 
 		std::string indexToStr( int index );
 		void updateHistoric( void );
+		bool premovedSquare( int square );
 
 	public:
 		Chess( void );
@@ -85,14 +87,18 @@ class Chess
 		int texIndex( char piece );
 		std::string getFEN( void );
 		void setColor( char color );
-		void setBoard( std::string fen );
+		std::array<int, 2> setBoard( std::string fen );
+		void navigateHistory( bool right, bool once = true );
 		void setCaptures( int index );
+		void resetPremoves( void );
+		void applyPremoves( void );
+
 		void drawSquare( std::vector<int> &vertices, int type, int startX, int startY, int square_size );
 		void drawWaitingRoom( std::vector<int> &vertices, int mouseX, int mouseY, int square_size, int win_width, int win_height );
 		void drawBoard( std::vector<int> &vertices, int except, int square_size );
 		std::array<int, 3> getSelectedSquare( double mouseX, double mouseY, int square_size );
 		bool forceMovePiece( int src, int dst );
-		void tryMovePiece( int src, int dst );
+		bool tryMovePiece( int src, int dst );
 };
 
 #endif

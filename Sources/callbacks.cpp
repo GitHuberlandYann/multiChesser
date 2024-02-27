@@ -1,5 +1,11 @@
 #include "Display.hpp"
 
+#if __linux__
+# define IS_LINUX true
+#else
+# define IS_LINUX false
+#endif
+
 Display *display = NULL;
 
 void set_display_callback( Display *dis )
@@ -21,11 +27,10 @@ void window_size_callback( GLFWwindow *window, int width, int height )
 	// std::cout << "window resized to " << width << ", " << height << std::endl;
 	if (display) {
 		display->setWindowSize(width, height);
-		glViewport(0, 0, width, height);
+		if (IS_LINUX) {
+			glViewport(0, 0, width, height);
+		}
 	}
-	// glfwGetFramebufferSize(window, &width, &height);
-	// std::cout << "frameBufferSize is " << width << ", " << height << std::endl;
-	// // glViewport(0, 0, width, height);
 }
 
 void error_callback( int error, const char *msg )
@@ -48,6 +53,7 @@ namespace INPUT
 			return ;
 		}
 		// std::cout << "codepoint you just pressed: " << codepoint << " => " << ALPHABETA[codepoint - 32] << std::endl;
+		if (message.size() >= 20) return ;
 		if (cursor == static_cast<int>(message.size())) {
 			message += ALPHABETA[codepoint - 32];
 		} else {
@@ -73,6 +79,14 @@ namespace INPUT
 		if (!cursor) return ;
 		message = message.substr(0, cursor - 1) + message.substr(cursor);
 		--cursor;
+	}
+
+	bool validUsername( void )
+	{
+		for (char c : message) {
+			if (c != ' ') return (true);
+		}
+		return (false);
 	}
 
 	std::string getCurrentMessage( void )

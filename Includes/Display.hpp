@@ -38,7 +38,7 @@ class Display
 		GLFWwindow *_window;
 		GLuint _vao, _vbo, _shaderProgram;
 		GLint _winWidth, _winHeight, _squareSize, _uniWidth, _uniHeight;
-		GLuint *_texture;
+		GLuint _texture;
 		Client *_client;
 		Chess *_chess;
 		Text *_text;

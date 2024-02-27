@@ -11,6 +11,7 @@ namespace INPUT
 	void character_callback( GLFWwindow* window, unsigned int codepoint );
 	void moveCursor( bool right, bool control );
 	void rmLetter( void );
+	bool validUsername( void );
 	std::string getCurrentMessage( void );
 	std::string getCurrentInputStr( char c );
 }

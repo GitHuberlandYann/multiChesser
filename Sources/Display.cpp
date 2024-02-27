@@ -3,7 +3,7 @@
 
 Display::Display( void )
 	: _window(NULL), _winWidth(WIN_WIDTH), _winHeight(WIN_HEIGHT),
-		_texture(NULL), _client(NULL), _state(STATE::MENU), _port(PORT),
+		_texture(0), _client(NULL), _state(STATE::MENU), _port(PORT),
 		_selection(0), _input_released(0), _mouse_pressed(false),
 		_selected_piece({PIECES::EMPTY, -1, -1}), _ip("localhost")
 {
@@ -16,8 +16,7 @@ Display::~Display( void )
 	std::cout << "Destructor of display called" << std::endl;
 
 	if (_texture) {
-		glDeleteTextures(1, _texture);
-		delete [] _texture;
+		glDeleteTextures(1, &_texture);
 	}
 
 	glDeleteProgram(_shaderProgram);
@@ -115,11 +114,10 @@ void Display::load_texture( void )
 	_text->load_texture();
 	glUseProgram(_shaderProgram);
 
-	_texture = new GLuint[1];
-	glGenTextures(1, _texture);
+	glGenTextures(1, &_texture);
 
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D_ARRAY, _texture[0]);
+	glBindTexture(GL_TEXTURE_2D_ARRAY, _texture);
 
 	// alocate pixel data
 	// mipmap level set to 1
@@ -147,19 +145,23 @@ void Display::load_texture( void )
 
 void Display::handleMenuInputs( void )
 {
-	std::string username = INPUT::getCurrentMessage();
 	if (glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
 		double mouseX, mouseY;
 		glfwGetCursorPos(_window, &mouseX, &mouseY);
 		if (_selection == SELECT::USERNAME) {
 			_state = STATE::INPUT;
 			glfwSetCharCallback(_window, INPUT::character_callback);
-		} else if (_selection == SELECT::PLAY && username[0]) {
+		} else if (_selection == SELECT::PLAY && INPUT::validUsername()) {
 			goto WAITING_ROOM;
 		} else {
 			_state = STATE::MENU;
 			glfwSetCharCallback(_window, NULL);
 		}
+	}
+	if (_state == STATE::MENU && glfwGetKey(_window, GLFW_KEY_TAB)) {
+		_state = STATE::INPUT;
+		glfwSetCharCallback(_window, INPUT::character_callback);
+		return ;
 	}
 
 	if (_state == STATE::INPUT) {
@@ -179,18 +181,18 @@ void Display::handleMenuInputs( void )
 		if (glfwGetKey(_window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 			_state = STATE::MENU;
 			glfwSetCharCallback(_window, NULL);
-		} else if (glfwGetKey(_window, GLFW_KEY_ENTER) == GLFW_PRESS && username[0]) {
+		} else if (glfwGetKey(_window, GLFW_KEY_ENTER) == GLFW_PRESS && INPUT::validUsername()) {
 			goto WAITING_ROOM;
 		}
 	}
 	return ;
 	WAITING_ROOM:
-	_username = username;
+	_username = INPUT::getCurrentMessage();
 	glfwSetCharCallback(_window, NULL);
 	glfwSetCursorPosCallback(_window, NULL);
 	_client = new Client();
 	_client->setDisplay(this);
-	_client->connectSocket(_ip, _port, username);
+	_client->connectSocket(_ip, _port, _username);
 	// std::cout << "debug after connect" << std::endl;
 	_state = STATE::WAITING_ROOM;
 	glfwSetWindowTitle(_window, "Waiting room.");
@@ -241,6 +243,20 @@ void Display::handleInputs( void )
 	if (glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
 		_selected_piece = {PIECES::EMPTY, -1, -1};
 		_chess->setCaptures(-1);
+		_chess->resetPremoves();
+	}
+
+	if (++_input_released == 1 && glfwGetKey(_window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
+		_chess->navigateHistory(true);
+	} else if (_input_released == 1 && glfwGetKey(_window, GLFW_KEY_LEFT) == GLFW_PRESS) {
+		_chess->navigateHistory(false);
+	} else if (_input_released == 1 && glfwGetKey(_window, GLFW_KEY_UP) == GLFW_PRESS) {
+		_chess->navigateHistory(false, false);
+	} else if (_input_released == 1 && glfwGetKey(_window, GLFW_KEY_DOWN) == GLFW_PRESS) {
+		_chess->navigateHistory(true, false);
+	} else if (glfwGetKey(_window, GLFW_KEY_RIGHT) == GLFW_RELEASE && glfwGetKey(_window, GLFW_KEY_LEFT) == GLFW_RELEASE
+		&& glfwGetKey(_window, GLFW_KEY_RIGHT) == GLFW_RELEASE && glfwGetKey(_window, GLFW_KEY_LEFT) == GLFW_RELEASE) {
+		_input_released = 0;
 	}
 }
 
@@ -284,7 +300,7 @@ void Display::draw( void )
 			_text->addText(_winWidth / 2 - 2 * gui_size - 1, 3 * _winHeight / 4 - (_squareSize + 4 * gui_size / 3) / 2 - 1, 4 * gui_size / 3, false, "PLAY");
 			_text->addText(_winWidth / 2 - 2 * gui_size, 3 * _winHeight / 4 - (_squareSize + 4 * gui_size / 3) / 2, 4 * gui_size / 3, true, "PLAY");
 			drawRectangle(vertices, 0, _winWidth / 4, _winHeight / 4, _winWidth / 2, _squareSize);
-			drawRectangle(vertices, _selection == SELECT::PLAY && username.size() > 1, _winWidth / 4, 3 * _winHeight / 4 - _squareSize, _winWidth / 2, _squareSize);
+			drawRectangle(vertices, _selection == SELECT::PLAY && INPUT::validUsername(), _winWidth / 4, 3 * _winHeight / 4 - _squareSize, _winWidth / 2, _squareSize);
 			break ;
 		case STATE::WAITING_ROOM:
 			double mouseX, mouseY;
@@ -409,8 +425,13 @@ void Display::parseServerInput( std::string str )
 			_state = STATE::INGAME;
 			glfwSetWindowTitle(_window, "multiChesser");
 		}
-		_chess->setBoard(str.substr(5));
+		std::array<int, 2> move = _chess->setBoard(str.substr(5));
 		_chess->setCaptures(-1);
+		if (_chess->forceMovePiece(move[0], move[1])) {
+			_client->setMsg(move[0], move[1]);
+		} else {
+			_chess->applyPremoves();
+		}
 	} else if (!str.compare(0, 5, "col: ")) {
 		_chess->setColor(str[5]);
 	} else if (!str.compare(0, 5, "OPP: ")) {

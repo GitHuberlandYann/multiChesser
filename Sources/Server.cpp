@@ -153,8 +153,13 @@ void Server::parseClientInput( int client_id, std::string str )
 		// std::cout << "move piece " << src << ", " << dst << std::endl;
 		for (auto &r : _rooms) {
 			if (client_id == r.white || client_id == r.black) {
-				r.chess->tryMovePiece(src, dst);
-				r.modif = true;
+				if (r.chess->tryMovePiece(src, dst)) {
+					r.modif = true;
+				} else {
+					std::string msg = r.chess->getFEN();
+					send(client_id, &msg[0], msg.size(), 0);
+				}
+				break ;
 			}
 		}
 	}

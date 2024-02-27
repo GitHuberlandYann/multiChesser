@@ -3,7 +3,7 @@
 
 Chess::Chess( void )
 	: _board(PIECES::board_init), _castle_state("KQkq"), _en_passant("-"),
-	_half_moves(0), _full_moves(1), _last_move({-1, -1}), _turn(TURN_WHITE), _color(TURN_WHITE)
+	_half_moves(0), _full_moves(1), _current_board(0), _last_move({-1, -1}), _turn(TURN_WHITE), _color(TURN_WHITE)
 {
 	_captured.fill(false);
 }
@@ -239,17 +239,37 @@ void Chess::updateHistoric( void )
 	if (!_game_history.size()) {
 		_game_history.push_back(_board);
 	} else if (_game_history.back() != _board) {
-		for (int index = 0, i = 0; index < 2; ++index) {
+		for (int index = 0, i = 0; index < 4; ++index) { // in range 3 because when you castle 4 squares are modified
 			for (; i < 64; ++i) {
 				if (_board[i] != _game_history.back()[i]) {
-					std::cout << "last move " << index << ": " << indexToStr(i) << std::endl;
-					_last_move[index] = i++; // used to highlight squares
+					// std::cout << "last move " << index << ": " << indexToStr(i) << std::endl;
+					if (index == 2) {
+						if (!(_last_move[0] & 0x7) || (_last_move[0] & 0x7) == 7) {
+							_last_move[0] = _last_move[1];
+						} else {
+							index = 5;
+						}
+					}
+					_last_move[!!index] = i++; // used to highlight squares
 					break ;
 				}
 			}
 		}
 		_game_history.push_back(_board);
+		_current_board = _game_history.size() - 1;
+	} else { // we sent an illegal move/premove
+		_premoves.clear();
 	}
+}
+
+bool Chess::premovedSquare( int square )
+{
+	for (auto move : _premoves) {
+		if (square == move[0] || square == move[1]) {
+			return (true);
+		}
+	}
+	return (false);
 }
 
 // ************************************************************************** //
@@ -313,7 +333,8 @@ void Chess::setColor( char color )
 	_color = color;
 }
 
-void Chess::setBoard( std::string fen )
+// set board by parsing fen, then return premove if in memory
+std::array<int, 2> Chess::setBoard( std::string fen )
 {
 	int i = 0, bi = 0;
 	for (; fen[i] != ' '; ++i) {
@@ -339,6 +360,24 @@ void Chess::setBoard( std::string fen )
 	++i;
 	_full_moves = 0;
 	for (; fen[i] != '\n'; ++i) _full_moves = _full_moves * 10 + fen[i] - '0';
+
+	if (_turn == _color && _premoves.size()) {
+		std::array<int, 2> res = {_premoves[0][0], _premoves[0][1]};
+		_premoves.erase(_premoves.begin());
+		return (res);
+	}
+	return {-1, -1};
+}
+
+void Chess::navigateHistory( bool right, bool once )
+{
+	if (once) {
+		_current_board += (right) ? 1 : -1;
+		if (_current_board < 0) _current_board = 0;
+		else if (_current_board >= static_cast<int>(_game_history.size())) _current_board = _game_history.size() - 1;
+	} else {
+		_current_board = (right) ? _game_history.size() - 1 : 0;
+	}
 }
 
 void Chess::setCaptures( int index )
@@ -371,6 +410,22 @@ void Chess::setCaptures( int index )
 		case PIECES::PAWN:
 			addPawnLegalMoves(index);
 			break ;
+	}
+}
+
+void Chess::resetPremoves( void )
+{
+	_premoves.clear();
+	if (_game_history.size()) {
+		_board = _game_history.back();
+	}
+}
+
+void Chess::applyPremoves( void )
+{
+	for (auto move : _premoves) {
+		_board[move[1]] = _board[move[0]];
+		_board[move[0]] = PIECES::EMPTY;
 	}
 }
 
@@ -417,24 +472,28 @@ void Chess::drawWaitingRoom( std::vector<int> &vertices, int mouseX, int mouseY,
 
 void Chess::drawBoard( std::vector<int> &vertices, int except, int square_size )
 {
+	bool current_board = _current_board == static_cast<int>(_game_history.size() - 1);
+	std::string board = (current_board) ? _board : _game_history[_current_board];
 	for (int row = 0; row < 8; ++row) {
 		for (int col = 0; col < 8; ++col) {
 			int square = (row << 3) + col;
-			if (square == _last_move[0] || square == _last_move[1]) {
-				drawSquare(vertices, TEXTURE::MOVE_HIGHLIGHT, square_size + col * square_size, square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size, square_size);
+			if (current_board && premovedSquare(square)) {
+				drawSquare(vertices, TEXTURE::MOVE_HIGHLIGHT, square_size + ((_color == TURN_WHITE) ? col : 7 - col) * square_size + (square_size >> 2), square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size + (square_size >> 2), square_size >> 1);
+			} else if (current_board && (square == _last_move[0] || square == _last_move[1])) {
+				drawSquare(vertices, TEXTURE::MOVE_HIGHLIGHT, square_size + ((_color == TURN_WHITE) ? col : 7 - col) * square_size, square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size, square_size);
 			} else {
-				drawSquare(vertices, !((row + col) & 0x1), square_size + col * square_size, square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size, square_size);
+				drawSquare(vertices, !((row + col) & 0x1), square_size + ((_color == TURN_WHITE) ? col : 7 - col) * square_size, square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size, square_size);
 			}
 			if (square == except) {
 				continue ; // we skip square at index 'except'
 			}
-			char piece = _board[square];
+			char piece = board[square];
 			if (piece != PIECES::EMPTY) {
-				drawSquare(vertices, texIndex(piece), square_size + col * square_size, square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size, square_size);
+				drawSquare(vertices, texIndex(piece), square_size + ((_color == TURN_WHITE) ? col : 7 - col) * square_size, square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size, square_size);
 			}
 
-			if (_captured[square]) {
-				drawSquare(vertices, (row + col) & 0x1, square_size + col * square_size + (square_size >> 2), square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size + (square_size >> 2), (square_size >> 1));
+			if (current_board && _captured[square]) {
+				drawSquare(vertices, (row + col) & 0x1, square_size + ((_color == TURN_WHITE) ? col : 7 - col) * square_size + (square_size >> 2), square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size + (square_size >> 2), (square_size >> 1));
 			}
 		}
 	}
@@ -452,6 +511,7 @@ std::array<int, 3> Chess::getSelectedSquare( double mouseX, double mouseY, int s
 		return {PIECES::EMPTY, -1, -1};
 	}
 	row = (_color == TURN_WHITE) ? row : 7 - row;
+	col = (_color == TURN_WHITE) ? col : 7 - col;
 	int offset = (row << 3) + col;
 	return {_board[offset], offset, offset};
 }
@@ -462,8 +522,18 @@ std::array<int, 3> Chess::getSelectedSquare( double mouseX, double mouseY, int s
 bool Chess::forceMovePiece( int src, int dst )
 {
 	if (src < 0 || src >= 64 || dst < 0 || dst >= 64) return (false);
+	if (_current_board != static_cast<int>(_game_history.size() - 1)) {
+		_board = _game_history.back();
+		_current_board = _game_history.size() - 1;
+		return (false);
+	}
 	int piece = _board[src], dest = _board[dst];
 	if (_color != _turn) { // not your turn
+		if ((_color == TURN_WHITE) ? isupper(piece) : islower(piece)) {
+			_premoves.push_back({src, dst});
+			_board[dst] = piece;
+			_board[src] = PIECES::EMPTY;
+		}
 		return (false);
 	}
 	if (dest != PIECES::EMPTY && isupper(piece) == isupper(dest)) { // autochess
@@ -474,19 +544,21 @@ bool Chess::forceMovePiece( int src, int dst )
 	return (true);
 }
 
-void Chess::tryMovePiece( int src, int dst )
+// check if move is legal
+// if it is, execute move and return true
+bool Chess::tryMovePiece( int src, int dst )
 {
-	if (src < 0 || src >= 64 || dst < 0 || dst >= 64) return ;
+	if (src < 0 || src >= 64 || dst < 0 || dst >= 64) return (false);
 	char piece = _board[src];
 	std::cout << _turn << " move " << piece << " from " << indexToStr(src) << " to " << indexToStr(dst) << std::endl;
 	if ((_turn == TURN_WHITE) ? !isupper(piece) : !islower(piece)) {
 		std::cout << "not your turn to move" << std::endl;
-		return ;
+		return (false);
 	}
 	_captured.fill(false);
 	switch (tolower(piece)) {
 		case PIECES::EMPTY:
-			return ;
+			return (false);
 		case PIECES::KING:
 			addKingLegalMoves(src);
 			break ;
@@ -513,7 +585,7 @@ void Chess::tryMovePiece( int src, int dst )
 			if (_captured[i]) std::cout << " " << indexToStr(i);
 		}
 		std::cout << std::endl;
-		return ;
+		return (false);
 	}
 
 	char tmp = _board[dst], tmpep = PIECES::EMPTY;
@@ -543,5 +615,7 @@ void Chess::tryMovePiece( int src, int dst )
 	} else { // move has been detected as legal, we procede to complete it
 		std::cout << "legal" << std::endl;
 		movePiece(src, dst, piece, tmp);
+		return (true);
 	}
+	return (false);
 }

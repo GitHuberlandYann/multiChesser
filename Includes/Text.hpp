@@ -10,7 +10,7 @@ class Text
 	private:
         GLuint _vao, _vbo, _shaderProgram;
 		GLint _uniWidth, _uniHeight;
-		GLuint *_textures;
+		GLuint _textures;
 		std::vector<int> _texts;
 
 	public:
