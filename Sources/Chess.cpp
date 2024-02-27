@@ -139,7 +139,7 @@ void Chess::addPawnLegalMoves( int index )
 
 // determines whether current board is a legal position, based on whose turn it is to play
 // we do that by filling bitboard with captured cases and checking if king is in check
-bool Chess::legalBoard( void )
+bool Chess::legalBoard( bool debug )
 {
 	int index = -1, king_pos = -1;
 	_captured.fill(false);
@@ -180,6 +180,7 @@ bool Chess::legalBoard( void )
 		std::cerr << "king missing from board" << std::endl;
 		return (false);
 	}
+	if (!debug) return (!_captured[king_pos]);
 	std::cout << "king at " << indexToStr(king_pos) << std::endl << "cap: ";
 	for (int i = 0; i < 64; ++i) {
 		if (_captured[i]) std::cout << " " << indexToStr(i);
@@ -232,6 +233,35 @@ std::string Chess::indexToStr( int index )
 	res[0] = static_cast<char>((index & 0x7) + 'a');
 	res[1] = static_cast<char>((7 - (index >> 3)) + '1');
 	return (res);
+}
+
+// return "FEN: " if ongoing game, otherwise return "END: " + short explaination
+std::string Chess::getFENPrefix( void )
+{
+	std::cout << "FENPrefix" << std::endl;
+	_color = _turn;
+	bool canMove = false;
+	std::array<bool, 64> moves;
+	for (int index = 0; index < 64; ++index) {
+		setCaptures(index);
+		moves = _captured;
+		for (int i = 0; i < 64; ++i) {
+			if (moves[i]) {
+				std::cout << "trying to move " << _board[index] << " from " << indexToStr(index) << " to " << indexToStr(i) << std::endl;
+				char tmp = _board[i];
+				_board[i] = _board[index];
+				_board[index] = PIECES::EMPTY;
+				canMove = legalBoard(false);
+				_board[index] = _board[i];
+				_board[i] = tmp;
+				if (canMove) {
+					std::cout << "ongoing game" << std::endl;
+					return ("FEN: ");
+				}
+			}
+		}
+	}
+	return (std::string("END: ") + (legalBoard(false) ? "pat" : "checkmate") + "\nFEN: ");
 }
 
 void Chess::updateHistoric( void )
@@ -297,9 +327,9 @@ int Chess::texIndex( char piece )
 }
 
 // Forsyth-Edwards Notation rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
-std::string Chess::getFEN( void )
+std::string Chess::getFEN( bool check_ended )
 {
-	std::string res = "FEN: ";
+	std::string res = (check_ended) ? getFENPrefix() : "FEN: ";
 	int cnt = 0;
 
 	for (int i = 0; i < 64; ++i) {

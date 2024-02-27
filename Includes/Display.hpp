@@ -19,7 +19,8 @@ namespace STATE
 		MENU,
 		INPUT,
 		WAITING_ROOM,
-		INGAME
+		INGAME,
+		ENDGAME
 	};
 }
 

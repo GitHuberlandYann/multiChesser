@@ -200,6 +200,7 @@ void Display::handleMenuInputs( void )
 
 void Display::handleInputs( void )
 {
+	if (_state == STATE::ENDGAME) goto NAVIGATE_HISTO;
 	double mouseX, mouseY;
 	glfwGetCursorPos(_window, &mouseX, &mouseY);
 	if (!_mouse_pressed && glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
@@ -246,6 +247,7 @@ void Display::handleInputs( void )
 		_chess->resetPremoves();
 	}
 
+	NAVIGATE_HISTO:
 	if (++_input_released == 1 && glfwGetKey(_window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
 		_chess->navigateHistory(true);
 	} else if (_input_released == 1 && glfwGetKey(_window, GLFW_KEY_LEFT) == GLFW_PRESS) {
@@ -308,6 +310,7 @@ void Display::draw( void )
 			_chess->drawWaitingRoom(vertices, mouseX, mouseY, _squareSize, _winWidth, _winHeight);
 			break ;
 		case STATE::INGAME:
+		case STATE::ENDGAME:
 			_text->addText(_squareSize * 5 - _squareSize / 6 * _username.size(), _winHeight - 4 * _squareSize / 5, _squareSize / 3, true, _username);
 			_text->addText(_squareSize * 5 - _squareSize / 6 * _opponent_username.size(), 4 * _squareSize / 5 - _squareSize / 3, _squareSize / 3, true, _opponent_username);
 			_chess->drawBoard(vertices, _selected_piece[2], _squareSize);
@@ -364,6 +367,9 @@ void Display::main_loop( void )
 				handleInputs();
 				_client->handleMessages();
 				// std::cout << "over" << std::endl;
+				break ;
+			case STATE::ENDGAME:
+				handleInputs();
 				break ;
 		}
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -427,7 +433,9 @@ void Display::parseServerInput( std::string str )
 		}
 		std::array<int, 2> move = _chess->setBoard(str.substr(5));
 		_chess->setCaptures(-1);
-		if (_chess->forceMovePiece(move[0], move[1])) {
+		if (_state == STATE::ENDGAME) {
+			_chess->resetPremoves();
+		} else if (_chess->forceMovePiece(move[0], move[1])) {
 			_client->setMsg(move[0], move[1]);
 		} else {
 			_chess->applyPremoves();
@@ -436,11 +444,14 @@ void Display::parseServerInput( std::string str )
 		_chess->setColor(str[5]);
 	} else if (!str.compare(0, 5, "OPP: ")) {
 		_opponent_username = str.substr(5, str.size() - 6);
+	} else if (!str.compare(0, 5, "END: ")) { // game ended (checkmate / draw / pat / repetition / resign / deconnection)
+		_state = STATE::ENDGAME;
+		delete _client;
+		_client = NULL;
 	}
 	// else if (!str.compare(0, 5, "PGN: ")) {
 	// 	_chess->setPGN(str);
 	// } else if (!str.compare(0, 5, "MSG: ")) { // msg from opponent
-	// } else if  (!str.compare(0, 5, "END: ")) { // game ended (checkmate / draw / pat / repetition / resign / deconnection)
 	// }
 }
 

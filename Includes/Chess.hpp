@@ -73,10 +73,11 @@ class Chess
 		void addKnightCaptures( int index );
 		void addPawnCaptures( int index );
 		void addPawnLegalMoves( int index );
-		bool legalBoard( void );
+		bool legalBoard( bool debug = true );
 		void movePiece( int src, int dst, char src_piece, char dst_piece );
 
 		std::string indexToStr( int index );
+		std::string getFENPrefix( void );
 		void updateHistoric( void );
 		bool premovedSquare( int square );
 
@@ -85,7 +86,7 @@ class Chess
 		~Chess( void );
 
 		int texIndex( char piece );
-		std::string getFEN( void );
+		std::string getFEN( bool check_ended );
 		void setColor( char color );
 		std::array<int, 2> setBoard( std::string fen );
 		void navigateHistory( bool right, bool once = true );
