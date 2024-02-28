@@ -53,6 +53,7 @@ namespace TEXTURE
 		MOVE_HIGHLIGHT,
 		HIGHLIGHT,
 		PREMOVE,
+		ARROW,
 		SIZE
 	};
 }
@@ -65,7 +66,7 @@ class Chess
 		std::array<bool, 64> _captured;
 		std::vector<std::string> _game_history;
 		std::map<std::string, int> _repetitions;
-		std::vector<std::array<int, 2>> _premoves;
+		std::vector<std::array<int, 2>> _premoves, _arrows;
 		std::vector<int> _highlights;
 		std::array<int, 2> _last_move;
 		char _turn, _color;
@@ -106,6 +107,7 @@ class Chess
 		void applyPremoves( void );
 
 		void drawSquare( std::vector<int> &vertices, int type, int startX, int startY, int square_size );
+		void drawArrows( std::vector<int> &vertices, int square_size );
 		void drawWaitingRoom( std::vector<int> &vertices, int mouseX, int mouseY, int square_size, int win_width, int win_height );
 		void drawBoard( std::vector<int> &vertices, int except, int square_size );
 		std::array<int, 3> getSelectedSquare( double mouseX, double mouseY, int square_size );

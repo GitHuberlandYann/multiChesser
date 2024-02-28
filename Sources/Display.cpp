@@ -122,7 +122,7 @@ void Display::load_texture( void )
 	// alocate pixel data
 	// mipmap level set to 1
 	// works because all images are 300x300
-	// layerCount is 15 (black + white + 6 white pieces + 6 black pieces + highlight)
+	// layerCount is 18 (black + white + 6 white pieces + 6 black pieces + highlight + highlight2 + premove + arrow)
 	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGBA8, 300, 300, TEXTURE::SIZE);
 	loadSubTextureArray(TEXTURE::BLACK_SQUARE, "Resources/back_black.png");
 	loadSubTextureArray(TEXTURE::WHITE_SQUARE, "Resources/back_white.png");
@@ -141,6 +141,7 @@ void Display::load_texture( void )
 	loadSubTextureArray(TEXTURE::MOVE_HIGHLIGHT, "Resources/highlight.png");
 	loadSubTextureArray(TEXTURE::HIGHLIGHT, "Resources/highlight2.png");
 	loadSubTextureArray(TEXTURE::PREMOVE, "Resources/premove.png");
+	loadSubTextureArray(TEXTURE::ARROW, "Resources/arrow.png");
 	glUniform1i(glGetUniformLocation(_shaderProgram, "pieces"), 0);
 	check_glstate("texture_2D_array done", true);
 }

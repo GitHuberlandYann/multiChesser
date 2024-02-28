@@ -1,5 +1,6 @@
 #include "Chess.hpp"
 #include <iostream>
+#include <math.h> // sqrt
 
 Chess::Chess( void )
 	: _board(PIECES::board_init), _castle_state("KQkq"), _en_passant("-"),
@@ -443,7 +444,7 @@ std::array<int, 2> Chess::setBoard( std::string fen )
 
 void Chess::navigateHistory( bool right, bool once )
 {
-	_highlights.clear();
+	resetHighlights();
 	if (once) {
 		_current_board += (right) ? 1 : -1;
 		if (_current_board < 0) _current_board = 0;
@@ -498,13 +499,20 @@ void Chess::setHighlight( int src, int dst )
 		}
 		_highlights.push_back(src);
 	} else {
-		std::cout << "arrow from " << indexToStr(src) << " to " << indexToStr(dst) << std::endl;
+		for (auto it = _arrows.begin(); it != _arrows.end(); ++it) {
+			if ((*it)[0] == src && (*it)[1] == dst) {
+				_arrows.erase(it);
+				return ;
+			}
+		}
+		_arrows.push_back({src, dst});
 	}
 }
 
 void Chess::resetHighlights( void )
 {
 	_highlights.clear();
+	_arrows.clear();
 }
 
 void Chess::resetPremoves( void )
@@ -564,6 +572,71 @@ void Chess::drawWaitingRoom( std::vector<int> &vertices, int mouseX, int mouseY,
 	}
 }
 
+static float dot( std::array<float, 2> a, std::array<float, 2> b )
+{
+	return (a[0] * b[0] + a[1] * b[1]);
+}
+
+static std::array<float, 3> cross( std::array<float, 3> a, std::array<float, 3> b )
+{
+	return {a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]};
+}
+
+static std::array<float, 2> normalize( std::array<float, 3> vec )
+{
+	std::array<float, 2> vec2 = {vec[0], vec[1]};
+	float denom = sqrt(dot(vec2, vec2));
+	return {vec[0] / denom, vec[1] / denom};
+}
+
+void Chess::drawArrows( std::vector<int> &vertices, int square_size )
+{
+	for (auto arrow : _arrows) {
+		// std::cout << "drawing arrow from " << indexToStr(arrow[0]) << " to " << indexToStr(arrow[1]) << std::endl;
+		std::array<float, 2> start = {static_cast<float>(square_size + ((_color == TURN_WHITE) ? (arrow[0] & 0x7) : 7 - (arrow[0] & 0x7)) * square_size + square_size / 2),
+				static_cast<float>(square_size + ((_color == TURN_WHITE) ? (arrow[0] >> 3) : 7 - (arrow[0] >> 3)) * square_size + square_size / 2)};
+		// std::cout << "start " << start[0] << ", " << start[1] << std::endl;
+		std::array<float, 2> end = {static_cast<float>(square_size + ((_color == TURN_WHITE) ? (arrow[1] & 0x7) : 7 - (arrow[1] & 0x7)) *square_size + square_size / 2),
+				static_cast<float>(square_size + ((_color == TURN_WHITE) ? (arrow[1] >> 3) : 7 - (arrow[1] >> 3)) * square_size + square_size / 2)};
+		// std::cout << "end " << end[0] << ", " << end[1] << std::endl;
+		std::array<float, 2> vec_dir = normalize({end[0] - start[0], end[1] - start[1]});
+		// std::cout << "vec_dir " << vec_dir[0] << ", " << vec_dir[1] << std::endl;
+		std::array<float, 2> vec_right = normalize(cross({vec_dir[0], vec_dir[1], 0}, {0, 0, -1}));
+		// std::cout << "vec_right " << vec_right[0] << ", " << vec_right[1] << std::endl;
+		// std::cout << "top left " << end[0] - 1 / 8 * vec_right[0] << ", " << end[1] - 1 / 8 * vec_right[1] << std::endl;
+		// rectangle part
+		vertices.push_back(0 + (0 << 1) + (TEXTURE::ARROW << 2));
+		vertices.push_back(end[0] - 3 * square_size / 8 * vec_dir[0] - square_size / 8 * vec_right[0]);
+		vertices.push_back(end[1] - 3 * square_size / 8 * vec_dir[1] - square_size / 8 * vec_right[1]);
+		vertices.push_back(1 + (0 << 1) + (TEXTURE::ARROW << 2));
+		vertices.push_back(end[0] - 3 * square_size / 8 * vec_dir[0] + square_size / 8 * vec_right[0]);
+		vertices.push_back(end[1] - 3 * square_size / 8 * vec_dir[1] + square_size / 8 * vec_right[1]);
+		vertices.push_back(0 + (1 << 1) + (TEXTURE::ARROW << 2));
+		vertices.push_back(start[0] + 3 * square_size / 8 * vec_dir[0] - square_size / 8 * vec_right[0]);
+		vertices.push_back(start[1] + 3 * square_size / 8 * vec_dir[1] - square_size / 8 * vec_right[1]);
+
+		vertices.push_back(1 + (0 << 1) + (TEXTURE::ARROW << 2));
+		vertices.push_back(end[0] - 3 * square_size / 8 * vec_dir[0] + square_size / 8 * vec_right[0]);
+		vertices.push_back(end[1] - 3 * square_size / 8 * vec_dir[1] + square_size / 8 * vec_right[1]);
+		vertices.push_back(1 + (1 << 1) + (TEXTURE::ARROW << 2));
+		vertices.push_back(start[0] + 3 * square_size / 8 * vec_dir[0] + square_size / 8 * vec_right[0]);
+		vertices.push_back(start[1] + 3 * square_size / 8 * vec_dir[1] + square_size / 8 * vec_right[1]);
+		vertices.push_back(0 + (1 << 1) + (TEXTURE::ARROW << 2));
+		vertices.push_back(start[0] + 3 * square_size / 8 * vec_dir[0] - square_size / 8 * vec_right[0]);
+		vertices.push_back(start[1] + 3 * square_size / 8 * vec_dir[1] - square_size / 8 * vec_right[1]);
+		// triangle part
+		vertices.push_back(0 + (0 << 1) + (TEXTURE::ARROW << 2));
+		vertices.push_back(end[0] - 3 * square_size / 8 * vec_dir[0] - square_size / 4 * vec_right[0]);
+		vertices.push_back(end[1] - 3 * square_size / 8 * vec_dir[1] - square_size / 4 * vec_right[1]);
+		vertices.push_back(1 + (0 << 1) + (TEXTURE::ARROW << 2));
+		vertices.push_back(end[0]);
+		vertices.push_back(end[1]);
+		vertices.push_back(0 + (1 << 1) + (TEXTURE::ARROW << 2));
+		vertices.push_back(end[0] - 3 * square_size / 8 * vec_dir[0] + square_size / 4 * vec_right[0]);
+		vertices.push_back(end[1] - 3 * square_size / 8 * vec_dir[1] + square_size / 4 * vec_right[1]);
+	}
+}
+
 void Chess::drawBoard( std::vector<int> &vertices, int except, int square_size )
 {
 	bool current_board = _current_board == static_cast<int>(_game_history.size() - 1);
@@ -594,6 +667,7 @@ void Chess::drawBoard( std::vector<int> &vertices, int except, int square_size )
 			}
 		}
 	}
+	drawArrows(vertices, square_size);
 }
 
 // return {piece at, index of square, index of square} from mouse position on screen
