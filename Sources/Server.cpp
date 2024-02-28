@@ -83,6 +83,8 @@ void Server::rmClientFromRoom( int id )
 				delete it->chess;
 				_rooms.erase(it);
 				std::cout << "room destroyed" << std::endl;
+			} else {
+				send(it->black, "END: disconnect\n", 17, 0);
 			}
 			return ;
 		}
@@ -93,6 +95,8 @@ void Server::rmClientFromRoom( int id )
 				delete it->chess;
 				_rooms.erase(it);
 				std::cout << "room destroyed" << std::endl;
+			} else {
+				send(it->white, "END: disconnect\n", 17, 0);
 			}
 			return ;
 		}

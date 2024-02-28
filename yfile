@@ -1,7 +1,6 @@
 TODOs:
 	- game timer
   - resign and draw-offer buttons
-  - button to cancel game search
   - instant message system
   - options (enable premove, enable display of legal moves)
   - PGN on side

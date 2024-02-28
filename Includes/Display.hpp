@@ -55,6 +55,7 @@ class Display
 		void load_texture( void );
 
 		void handleMenuInputs( void );
+		void handleWaitingInputs( void );
 		void handleInputs( void );
 		void drawRectangle( std::vector<int> &vertices, int type, int startX, int startY, int width, int height );
 		void draw( void );

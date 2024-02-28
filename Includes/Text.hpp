@@ -5,6 +5,12 @@
 
 # include <vector>
 
+namespace TEXT
+{
+	const int WHITE = 255;
+	const int BLACK = 0;
+}
+
 class Text
 {
 	private:
@@ -21,7 +27,7 @@ class Text
 		void setup_communication_shaders( void );
 		void load_texture( void );
 		void setWindowSize( int width, int height );
-        void addText( int posX, int posY, int font_size, bool white, std::string str );
+        void addText( int posX, int posY, int font_size, int grey_level, std::string str );
 		void toScreen( void );
 };
 

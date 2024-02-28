@@ -201,6 +201,17 @@ void Display::handleMenuInputs( void )
 	glfwSetWindowTitle(_window, "Waiting room.");
 }
 
+void Display::handleWaitingInputs( void )
+{
+	if (glfwGetKey(_window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+		_state = STATE::MENU;
+		delete _client;
+		_client = NULL;
+		glfwSetCursorPosCallback(_window, cursor_position_callback);
+		glfwSetWindowTitle(_window, "multiChess");
+	}
+}
+
 void Display::handleInputs( void )
 {
 	double mouseX, mouseY;
@@ -318,10 +329,10 @@ void Display::draw( void )
 		case STATE::MENU:
 			if (!username[0]) username = INPUT::getCurrentMessage();
 			gui_size = _squareSize / 3;
-			_text->addText(_winWidth / 4 + gui_size, _winHeight / 4 - gui_size * 1.25f, 2 * gui_size / 3, true, "Username");
-			_text->addText(_winWidth / 2 - 0.5f * gui_size * username.size(), _winHeight / 4 + (_squareSize - gui_size) / 2, gui_size, true, username);
-			_text->addText(_winWidth / 2 - 2 * gui_size - 1, 3 * _winHeight / 4 - (_squareSize + 4 * gui_size / 3) / 2 - 1, 4 * gui_size / 3, false, "PLAY");
-			_text->addText(_winWidth / 2 - 2 * gui_size, 3 * _winHeight / 4 - (_squareSize + 4 * gui_size / 3) / 2, 4 * gui_size / 3, true, "PLAY");
+			_text->addText(_winWidth / 4 + gui_size, _winHeight / 4 - gui_size * 1.25f, 2 * gui_size / 3, TEXT::WHITE, "Username");
+			_text->addText(_winWidth / 2 - 0.5f * gui_size * username.size(), _winHeight / 4 + (_squareSize - gui_size) / 2, gui_size, TEXT::WHITE, username);
+			_text->addText(_winWidth / 2 - 2 * gui_size - 1, 3 * _winHeight / 4 - (_squareSize + 4 * gui_size / 3) / 2 - 1, 4 * gui_size / 3, TEXT::BLACK, "PLAY");
+			_text->addText(_winWidth / 2 - 2 * gui_size, 3 * _winHeight / 4 - (_squareSize + 4 * gui_size / 3) / 2, 4 * gui_size / 3, TEXT::WHITE, "PLAY");
 			drawRectangle(vertices, 0, _winWidth / 4, _winHeight / 4, _winWidth / 2, _squareSize);
 			drawRectangle(vertices, _selection == SELECT::PLAY && INPUT::validUsername(), _winWidth / 4, 3 * _winHeight / 4 - _squareSize, _winWidth / 2, _squareSize);
 			break ;
@@ -329,11 +340,12 @@ void Display::draw( void )
 			double mouseX, mouseY;
 			glfwGetCursorPos(_window, &mouseX, &mouseY);
 			_chess->drawWaitingRoom(vertices, mouseX, mouseY, _squareSize, _winWidth, _winHeight);
+			_text->addText(_winWidth / 2 - 5.5f * _squareSize, _winHeight / 2 - 5 * _squareSize, 2 * _squareSize, 40, "Press\nESCAPE\n  to\ncancel");
 			break ;
 		case STATE::INGAME:
 		case STATE::ENDGAME:
-			_text->addText(_squareSize * 5 - _squareSize / 6 * _username.size(), _winHeight - 4 * _squareSize / 5, _squareSize / 3, true, _username);
-			_text->addText(_squareSize * 5 - _squareSize / 6 * _opponent_username.size(), 4 * _squareSize / 5 - _squareSize / 3, _squareSize / 3, true, _opponent_username);
+			_text->addText(_squareSize * 5 - _squareSize / 6 * _username.size(), _winHeight - 4 * _squareSize / 5, _squareSize / 3, TEXT::WHITE, _username);
+			_text->addText(_squareSize * 5 - _squareSize / 6 * _opponent_username.size(), 4 * _squareSize / 5 - _squareSize / 3, _squareSize / 3, TEXT::WHITE, _opponent_username);
 			_chess->drawBoard(vertices, _selected_piece[2], _squareSize);
 			if (_selected_piece[2] != -1) {
 				double mouseX, mouseY;
@@ -382,12 +394,13 @@ void Display::main_loop( void )
 				break ;
 			case STATE::WAITING_ROOM:
 				_client->handleMessages();
+				if (_state == STATE::WAITING_ROOM) {
+					handleWaitingInputs();
+				}
 				break ;
 			case STATE::INGAME:
-				// std::cout << "debug time" << std::endl;
 				handleInputs();
 				_client->handleMessages();
-				// std::cout << "over" << std::endl;
 				break ;
 			case STATE::ENDGAME:
 				if (_client) {
@@ -397,9 +410,17 @@ void Display::main_loop( void )
 				handleInputs();
 				break ;
 		}
-		glClear(GL_COLOR_BUFFER_BIT);
-		draw();
-		_text->toScreen();
+		if (_state == STATE::WAITING_ROOM) {
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			glEnable(GL_DEPTH_TEST);
+			draw();
+			_text->toScreen();
+			glDisable(GL_DEPTH_TEST);
+		} else {
+			glClear(GL_COLOR_BUFFER_BIT);
+			draw();
+			_text->toScreen();
+		}
 		glfwSwapBuffers(_window);
 		glfwPollEvents();
 	}

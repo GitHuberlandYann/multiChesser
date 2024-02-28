@@ -70,7 +70,7 @@ void Text::setWindowSize( int width, int height )
 	glUniform1i(_uniHeight, height);
 }
 
-void Text::addText( int posX, int posY, int font_size, bool white, std::string str )
+void Text::addText( int posX, int posY, int font_size, int grey_level, std::string str )
 {
 	int startX = posX;
 	for (size_t i = 0, charLine = 0; i < str.size(); i++) {
@@ -86,7 +86,7 @@ void Text::addText( int posX, int posY, int font_size, bool white, std::string s
 			posX = startX + charLine * font_size;
 		} else {
 			char c = str[i];
-			int spec = c + (white << 10);
+			int spec = c + (grey_level << 10);
 			_texts.push_back(spec + (0 << 8) + (0 << 9));
 			_texts.push_back(posX);
 			_texts.push_back(posY);
