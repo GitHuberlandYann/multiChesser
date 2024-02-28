@@ -43,9 +43,9 @@ class Display
 		Client *_client;
 		Chess *_chess;
 		Text *_text;
-		int _state, _port, _selection, _input_released;
+		int _state, _port, _selection, _highlight, _input_released;
 		std::string _username, _opponent_username;
-		bool _mouse_pressed;
+		bool _mouse_left, _mouse_right;
 		std::array<int, 3> _selected_piece; // {piece::value, starting_square, draw piece square}
 		std::string _ip;
 

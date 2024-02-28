@@ -302,6 +302,16 @@ bool Chess::premovedSquare( int square )
 	return (false);
 }
 
+bool Chess::highlightedSquare( int square )
+{
+	for (auto h : _highlights) {
+		if (h == square) {
+			return (true);
+		}
+	}
+	return (false);
+}
+
 // ************************************************************************** //
 //                                Public                                      //
 // ************************************************************************** //
@@ -376,6 +386,7 @@ std::array<int, 2> Chess::setBoard( std::string fen )
 			_board[bi++] = fen[i];
 		}
 	}
+	_highlights.clear();
 	updateHistoric();
 	_turn = fen[i + 1];
 	i += 3;
@@ -443,6 +454,27 @@ void Chess::setCaptures( int index )
 	}
 }
 
+void Chess::setHighlight( int src, int dst )
+{
+	if (src < 0 || src >= 64 || dst < 0 || dst >= 64) return ;
+	if (src == dst) {
+		for (auto it = _highlights.begin(); it != _highlights.end(); ++it) {
+			if (*it == src) {
+				_highlights.erase(it);
+				return ;
+			}
+		}
+		_highlights.push_back(src);
+	} else {
+		std::cout << "arrow from " << indexToStr(src) << " to " << indexToStr(dst) << std::endl;
+	}
+}
+
+void Chess::resetHighlights( void )
+{
+	_highlights.clear();
+}
+
 void Chess::resetPremoves( void )
 {
 	_premoves.clear();
@@ -507,12 +539,15 @@ void Chess::drawBoard( std::vector<int> &vertices, int except, int square_size )
 	for (int row = 0; row < 8; ++row) {
 		for (int col = 0; col < 8; ++col) {
 			int square = (row << 3) + col;
-			if (current_board && premovedSquare(square)) {
-				drawSquare(vertices, TEXTURE::MOVE_HIGHLIGHT, square_size + ((_color == TURN_WHITE) ? col : 7 - col) * square_size + (square_size >> 2), square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size + (square_size >> 2), square_size >> 1);
+			drawSquare(vertices, !((row + col) & 0x1), square_size + ((_color == TURN_WHITE) ? col : 7 - col) * square_size, square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size, square_size);
+			if (highlightedSquare(square)) {
+				drawSquare(vertices, TEXTURE::HIGHLIGHT, square_size + ((_color == TURN_WHITE) ? col : 7 - col) * square_size, square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size, square_size);
+			} else if (current_board && premovedSquare(square)) {
+				// drawSquare(vertices, TEXTURE::MOVE_HIGHLIGHT, square_size + ((_color == TURN_WHITE) ? col : 7 - col) * square_size + (square_size >> 2), square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size + (square_size >> 2), square_size >> 1);
+				drawSquare(vertices, TEXTURE::PREMOVE, square_size + ((_color == TURN_WHITE) ? col : 7 - col) * square_size, square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size, square_size);
 			} else if (current_board && (square == _last_move[0] || square == _last_move[1])) {
 				drawSquare(vertices, TEXTURE::MOVE_HIGHLIGHT, square_size + ((_color == TURN_WHITE) ? col : 7 - col) * square_size, square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size, square_size);
 			} else {
-				drawSquare(vertices, !((row + col) & 0x1), square_size + ((_color == TURN_WHITE) ? col : 7 - col) * square_size, square_size + ((_color == TURN_WHITE) ? row : 7 - row) * square_size, square_size);
 			}
 			if (square == except) {
 				continue ; // we skip square at index 'except'

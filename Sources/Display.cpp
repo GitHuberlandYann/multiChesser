@@ -4,7 +4,7 @@
 Display::Display( void )
 	: _window(NULL), _winWidth(WIN_WIDTH), _winHeight(WIN_HEIGHT),
 		_texture(0), _client(NULL), _state(STATE::MENU), _port(PORT),
-		_selection(0), _input_released(0), _mouse_pressed(false),
+		_selection(0), _input_released(0), _mouse_left(false), _mouse_right(false),
 		_selected_piece({PIECES::EMPTY, -1, -1}), _ip("localhost")
 {
 	_chess = new Chess();
@@ -123,7 +123,7 @@ void Display::load_texture( void )
 	// mipmap level set to 1
 	// works because all images are 300x300
 	// layerCount is 15 (black + white + 6 white pieces + 6 black pieces + highlight)
-	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGBA8, 300, 300, 15);
+	glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGBA8, 300, 300, TEXTURE::SIZE);
 	loadSubTextureArray(TEXTURE::BLACK_SQUARE, "Resources/back_black.png");
 	loadSubTextureArray(TEXTURE::WHITE_SQUARE, "Resources/back_white.png");
 	loadSubTextureArray(TEXTURE::WHITE_KING, "Resources/wk.png");
@@ -139,6 +139,8 @@ void Display::load_texture( void )
 	loadSubTextureArray(TEXTURE::BLACK_KNIGHT, "Resources/bn.png");
 	loadSubTextureArray(TEXTURE::BLACK_PAWN, "Resources/bp.png");
 	loadSubTextureArray(TEXTURE::MOVE_HIGHLIGHT, "Resources/highlight.png");
+	loadSubTextureArray(TEXTURE::HIGHLIGHT, "Resources/highlight2.png");
+	loadSubTextureArray(TEXTURE::PREMOVE, "Resources/premove.png");
 	glUniform1i(glGetUniformLocation(_shaderProgram, "pieces"), 0);
 	check_glstate("texture_2D_array done", true);
 }
@@ -203,9 +205,10 @@ void Display::handleInputs( void )
 	if (_state == STATE::ENDGAME) goto NAVIGATE_HISTO;
 	double mouseX, mouseY;
 	glfwGetCursorPos(_window, &mouseX, &mouseY);
-	if (!_mouse_pressed && glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
-		_mouse_pressed = true;
+	if (!_mouse_left && glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+		_mouse_left = true;
 		_chess->setCaptures(-1);
+		_chess->resetHighlights();
 		if (_selected_piece[0] == PIECES::EMPTY) {
 			_selected_piece = _chess->getSelectedSquare(mouseX, mouseY, _squareSize);
 			if (_selected_piece[0] == PIECES::EMPTY) {
@@ -225,8 +228,8 @@ void Display::handleInputs( void )
 			_selected_piece = {PIECES::EMPTY, -1, -1};
 		}
 		// std::cout << "piece " << _selected_piece[0] << " at " << _selected_piece[1] << std::endl;
-	} else if (_mouse_pressed && glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
-		_mouse_pressed = false;
+	} else if (_mouse_left && glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_RELEASE) {
+		_mouse_left = false;
 		if (_selected_piece[0] != PIECES::EMPTY) {
 			int dst = _chess->getSelectedSquare(mouseX, mouseY, _squareSize)[1];
 			if (dst == _selected_piece[1]) {
@@ -241,10 +244,19 @@ void Display::handleInputs( void )
 		}
 	}
 
-	if (glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
+	if (!_mouse_right && glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
+		_mouse_right = true;
+		if (_selected_piece[0] == PIECES::EMPTY) {
+			_highlight = _chess->getSelectedSquare(mouseX, mouseY, _squareSize)[1];
+		} else {
+			_highlight = -1;
+		}
 		_selected_piece = {PIECES::EMPTY, -1, -1};
 		_chess->setCaptures(-1);
 		_chess->resetPremoves();
+	} else if (_mouse_right && glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_RELEASE) {
+		_mouse_right = false;
+		_chess->setHighlight(_highlight, _chess->getSelectedSquare(mouseX, mouseY, _squareSize)[1]);
 	}
 
 	NAVIGATE_HISTO:

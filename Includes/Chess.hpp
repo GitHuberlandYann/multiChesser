@@ -49,7 +49,10 @@ namespace TEXTURE
 		BLACK_BISHOP,
 		BLACK_KNIGHT,
 		BLACK_PAWN,
-		MOVE_HIGHLIGHT
+		MOVE_HIGHLIGHT,
+		HIGHLIGHT,
+		PREMOVE,
+		SIZE
 	};
 }
 
@@ -61,6 +64,7 @@ class Chess
 		std::array<bool, 64> _captured;
 		std::vector<std::string> _game_history;
 		std::vector<std::array<int, 2>> _premoves;
+		std::vector<int> _highlights;
 		std::array<int, 2> _last_move;
 		char _turn, _color;
 
@@ -80,6 +84,7 @@ class Chess
 		std::string getFENPrefix( void );
 		void updateHistoric( void );
 		bool premovedSquare( int square );
+		bool highlightedSquare( int square );
 
 	public:
 		Chess( void );
@@ -91,6 +96,8 @@ class Chess
 		std::array<int, 2> setBoard( std::string fen );
 		void navigateHistory( bool right, bool once = true );
 		void setCaptures( int index );
+		void setHighlight( int src, int dst );
+		void resetHighlights( void );
 		void resetPremoves( void );
 		void applyPremoves( void );
 

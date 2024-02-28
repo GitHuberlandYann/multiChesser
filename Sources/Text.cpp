@@ -1,6 +1,6 @@
 #include "Text.hpp"
 
-Text::Text( void ) : _textures(0)
+Text::Text( void ) : _texture(0)
 {
 }
 
@@ -10,8 +10,8 @@ Text::~Text( void )
 	glDeleteBuffers(1, &_vbo);
 	glDeleteVertexArrays(1, &_vao);
 
-	if (_textures) {
-		glDeleteTextures(1, &_textures);
+	if (_texture) {
+		glDeleteTextures(1, &_texture);
 	}
 	glDeleteProgram(_shaderProgram);
 }
@@ -56,9 +56,9 @@ void Text::load_texture( void )
 {
 	glUseProgram(_shaderProgram);
 
-	glGenTextures(1, &_textures);
+	glGenTextures(1, &_texture);
 
-	loadTextureShader(1, _textures, "Resources/asciiAtlas.png");
+	loadTextureShader(1, _texture, "Resources/asciiAtlas.png");
 	glUniform1i(glGetUniformLocation(_shaderProgram, "asciiAtlas"), 1); // sampler2D #index in fragment shader
 }
 
