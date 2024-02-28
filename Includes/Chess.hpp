@@ -3,6 +3,7 @@
 
 # include <string>
 # include <vector>
+# include <map>
 # include <array>
 
 # define TURN_WHITE 'w'
@@ -63,6 +64,7 @@ class Chess
 		int _half_moves, _full_moves, _current_board;
 		std::array<bool, 64> _captured;
 		std::vector<std::string> _game_history;
+		std::map<std::string, int> _repetitions;
 		std::vector<std::array<int, 2>> _premoves;
 		std::vector<int> _highlights;
 		std::array<int, 2> _last_move;
@@ -81,7 +83,7 @@ class Chess
 		void movePiece( int src, int dst, char src_piece, char dst_piece );
 
 		std::string indexToStr( int index );
-		std::string getFENPrefix( void );
+		std::string getFENPrefix( std::string fen );
 		void updateHistoric( void );
 		bool premovedSquare( int square );
 		bool highlightedSquare( int square );
@@ -91,8 +93,10 @@ class Chess
 		~Chess( void );
 
 		int texIndex( char piece );
-		std::string getFEN( bool check_ended );
+		std::string getFEN( void );
+		std::string getFEND( void );
 		void setColor( char color );
+		bool myTurn( void );
 		std::array<int, 2> setBoard( std::string fen );
 		void navigateHistory( bool right, bool once = true );
 		void setCaptures( int index );

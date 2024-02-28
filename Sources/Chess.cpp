@@ -236,7 +236,7 @@ std::string Chess::indexToStr( int index )
 }
 
 // return "FEN: " if ongoing game, otherwise return "END: " + short explaination
-std::string Chess::getFENPrefix( void )
+std::string Chess::getFENPrefix( std::string fen )
 {
 	std::cout << "FENPrefix" << std::endl;
 	_color = _turn;
@@ -247,7 +247,7 @@ std::string Chess::getFENPrefix( void )
 		moves = _captured;
 		for (int i = 0; i < 64; ++i) {
 			if (moves[i]) {
-				std::cout << "trying to move " << _board[index] << " from " << indexToStr(index) << " to " << indexToStr(i) << std::endl;
+				// std::cout << "trying to move " << _board[index] << " from " << indexToStr(index) << " to " << indexToStr(i) << std::endl;
 				char tmp = _board[i];
 				_board[i] = _board[index];
 				_board[index] = PIECES::EMPTY;
@@ -255,13 +255,26 @@ std::string Chess::getFENPrefix( void )
 				_board[index] = _board[i];
 				_board[i] = tmp;
 				if (canMove) {
-					std::cout << "ongoing game" << std::endl;
-					return ("FEN: ");
+					if (_half_moves == 50) {
+						return ("END: 50 moves rule\n");
+					} else {
+						// std::cout << "fen in getFENPrefix: |" << fen << "|" << std::endl;
+						auto search = _repetitions.find(fen);
+						if (search == _repetitions.end()) {
+							_repetitions.insert({fen, 1});
+						} else {
+							if (++search->second >= 3) {
+								return ("END: repetition\n");
+							}
+						}
+					}
+					// std::cout << "ongoing game" << std::endl;
+					return ("");
 				}
 			}
 		}
 	}
-	return (std::string("END: ") + (legalBoard(false) ? "pat" : "checkmate") + "\nFEN: ");
+	return (std::string("END: ") + (legalBoard(false) ? "pat" : "checkmate") + "\n");
 }
 
 void Chess::updateHistoric( void )
@@ -337,9 +350,9 @@ int Chess::texIndex( char piece )
 }
 
 // Forsyth-Edwards Notation rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
-std::string Chess::getFEN( bool check_ended )
+std::string Chess::getFEN( void )
 {
-	std::string res = (check_ended) ? getFENPrefix() : "FEN: ";
+	std::string res = "FEN: ";
 	int cnt = 0;
 
 	for (int i = 0; i < 64; ++i) {
@@ -368,9 +381,27 @@ std::string Chess::getFEN( bool check_ended )
 	return (res + '\n');
 }
 
+// same as getFEN, but first we check if game somehow ended and append the 
+// result with appropriate message
+std::string Chess::getFEND( void )
+{
+	std::string fen = getFEN();
+	int end = 5;
+	for (int index = 0; index < 3; ++index) {
+		++end;
+		for (; fen[end] != ' '; ++end);
+	}
+	return (getFENPrefix(fen.substr(5, end - 5)) + fen);
+}
+
 void Chess::setColor( char color )
 {
 	_color = color;
+}
+
+bool Chess::myTurn( void )
+{
+	return (_color == _turn);
 }
 
 // set board by parsing fen, then return premove if in memory
@@ -412,6 +443,7 @@ std::array<int, 2> Chess::setBoard( std::string fen )
 
 void Chess::navigateHistory( bool right, bool once )
 {
+	_highlights.clear();
 	if (once) {
 		_current_board += (right) ? 1 : -1;
 		if (_current_board < 0) _current_board = 0;

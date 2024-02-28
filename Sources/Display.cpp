@@ -202,9 +202,15 @@ void Display::handleMenuInputs( void )
 
 void Display::handleInputs( void )
 {
-	if (_state == STATE::ENDGAME) goto NAVIGATE_HISTO;
 	double mouseX, mouseY;
 	glfwGetCursorPos(_window, &mouseX, &mouseY);
+	if (_state == STATE::ENDGAME) {
+		if (glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
+			if (!_mouse_left) _chess->resetHighlights();
+			_mouse_left = true;
+		} else _mouse_left = false;
+		goto NAVIGATE_HISTO;
+	}
 	if (!_mouse_left && glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS) {
 		_mouse_left = true;
 		_chess->setCaptures(-1);
@@ -214,6 +220,8 @@ void Display::handleInputs( void )
 			if (_selected_piece[0] == PIECES::EMPTY) {
 				_selected_piece[2] = -1;
 			}
+		} else if (!_chess->myTurn()) {
+			_selected_piece = {PIECES::EMPTY, -1, -1};
 		} else {
 			std::array<int, 3> dst = _chess->getSelectedSquare(mouseX, mouseY, _squareSize);
 			if (dst[1] == _selected_piece[1]) {
@@ -244,6 +252,7 @@ void Display::handleInputs( void )
 		}
 	}
 
+	NAVIGATE_HISTO:
 	if (!_mouse_right && glfwGetMouseButton(_window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
 		_mouse_right = true;
 		if (_selected_piece[0] == PIECES::EMPTY) {
@@ -259,7 +268,6 @@ void Display::handleInputs( void )
 		_chess->setHighlight(_highlight, _chess->getSelectedSquare(mouseX, mouseY, _squareSize)[1]);
 	}
 
-	NAVIGATE_HISTO:
 	if (++_input_released == 1 && glfwGetKey(_window, GLFW_KEY_RIGHT) == GLFW_PRESS) {
 		_chess->navigateHistory(true);
 	} else if (_input_released == 1 && glfwGetKey(_window, GLFW_KEY_LEFT) == GLFW_PRESS) {

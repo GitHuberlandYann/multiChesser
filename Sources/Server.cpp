@@ -115,7 +115,7 @@ void Server::roomsBroadcast( fd_set *wfds )
 {
 	for (auto &r : _rooms) {
 		if (r.modif) {
-			std::string msg = r.chess->getFEN(true);
+			std::string msg = r.chess->getFEND();
 			if (FD_ISSET(r.white, wfds)) {
 				send(r.white, &msg[0], msg.size(), 0);
 			}
@@ -156,7 +156,7 @@ void Server::parseClientInput( int client_id, std::string str )
 				if (r.chess->tryMovePiece(src, dst)) {
 					r.modif = true;
 				} else {
-					std::string msg = r.chess->getFEN(false);
+					std::string msg = r.chess->getFEN();
 					send(client_id, &msg[0], msg.size(), 0);
 				}
 				break ;
